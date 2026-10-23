@@ -1,0 +1,24 @@
+# Nombre fijo: el volumen siempre es fids-monitor_fids-data, esté donde esté esta carpeta
+name: fids-monitor
+
+services:
+  fids-monitor:
+    build: .
+    image: fids-monitor:latest
+    container_name: fids-monitor
+    restart: unless-stopped
+    # VNC_PASSWORD y demás ajustes salen de .env (copia .env.example)
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+    ports:
+      # Solo accesible desde esta PC. Para abrirlo a la red cambia a "8080:8080".
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Inventario (equipos agregados, contraseñas propias). Volumen de Docker: sobrevive a
+      # reconstruir o borrar el contenedor. Solo se pierde con "docker compose down -v".
+      - fids-data:/app/data
+
+volumes:
+  fids-data:

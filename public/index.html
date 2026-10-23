@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FIDS Monitor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="row1">
+      <h1>FIDS Monitor</h1>
+      <div class="summary" id="summary"></div>
+      <div class="actions">
+        <button id="refreshAll" title="Vuelve a revisar todos los equipos ahora">↻ Actualizar todo</button>
+        <button id="addBtn">＋ Agregar equipo</button>
+        <button id="scanBtn" title="Busca en la red equipos con VNC que no están en la lista">Buscar equipos nuevos</button>
+        <button id="importBtn">Importar Excel</button>
+        <input id="importFile" type="file" accept=".xlsx" hidden>
+      </div>
+    </div>
+    <div class="row2">
+      <input id="search" type="search" placeholder="Buscar nombre, ubicación o IP…" autocomplete="off">
+      <select id="group"><option value="">Todas las zonas</option></select>
+      <div class="seg" id="statusSeg" role="group" aria-label="Estado">
+        <button data-v="all" class="on">Todos</button>
+        <button data-v="online">En línea</button>
+        <button data-v="offline">Caídos</button>
+        <button data-v="error">Con error</button>
+        <button data-v="review" title="Pantallas con alerta (NG-Client no visible, negra, en blanco, distinta a lo normal) o con error">Revisar</button>
+      </div>
+      <div class="seg" id="viewSeg" role="group" aria-label="Vista">
+        <button data-v="grid" class="on" title="Cuadrícula">▦ Cuadrícula</button>
+        <button data-v="list" title="Lista">☰ Lista</button>
+      </div>
+    </div>
+  </header>
+  <main id="groups"></main>
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- Agregar / editar equipo -->
+  <dialog id="devDialog">
+    <form id="devForm" method="dialog">
+      <h2 id="devTitle">Agregar equipo</h2>
+      <label>Nombre <input name="name" placeholder="SAP-GATE-08" autocomplete="off"></label>
+      <label>IP <input name="ip" required placeholder="192.168.10.120" autocomplete="off"></label>
+      <label>Ubicación / descripción <input name="description" autocomplete="off"></label>
+      <div class="two">
+        <label>Zona <select name="group"></select></label>
+        <label>Puerto VNC <input name="port" type="number" min="1" max="65535" placeholder="5900"></label>
+      </div>
+      <label>Contraseña VNC propia
+        <input name="password" type="password" autocomplete="new-password" placeholder="Vacío = usar la contraseña general">
+      </label>
+      <label class="chk" id="clearPwRow" hidden><input type="checkbox" name="clearPassword"> Quitar la contraseña propia (volver a la general)</label>
+      <fieldset id="screenRefs" class="refs" hidden>
+        <legend>Pantalla</legend>
+        <p class="muted small" id="refsInfo"></p>
+        <div class="refBtns">
+          <button type="button" id="setBaseline" title="Guarda la pantalla actual como la normal de este equipo; avisará si después se ve muy distinta">✓ Así se ve normal</button>
+          <button type="button" id="clearBaseline" hidden>Quitar referencia</button>
+          <button type="button" id="markDesktop" title="Usa el color de fondo de esta pantalla para reconocer el escritorio de Windows en todos los equipos">Esto es el escritorio (NG-Client no visible)</button>
+        </div>
+      </fieldset>
+      <p class="formErr" id="devErr" hidden></p>
+      <div class="dlgBtns">
+        <button type="button" id="devDelete" class="danger" hidden>Eliminar</button>
+        <span class="spacer"></span>
+        <button type="button" data-close>Cancelar</button>
+        <button type="submit" class="primary" id="devSave">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Buscar equipos nuevos -->
+  <dialog id="scanDialog" class="wide">
+    <h2>Buscar equipos nuevos</h2>
+    <p class="muted">Revisa la red buscando equipos con VNC (puerto 5900) que no estén en la lista, y prueba en cada uno la contraseña general.</p>
+    <form id="scanForm" class="scanBar">
+      <label>Red <input name="prefix" placeholder="192.168.10" autocomplete="off"></label>
+      <button type="submit" class="primary" id="scanGo">Buscar</button>
+      <span class="spacer"></span>
+      <button type="button" data-close>Cerrar</button>
+    </form>
+    <div id="scanResults"></div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
