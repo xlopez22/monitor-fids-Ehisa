@@ -48,6 +48,10 @@ async function api(method, url, body, raw = false) {
     else { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
   }
   const r = await fetch(url, opts);
+  if (r.status === 401) {
+    location.replace('/login.html');
+    throw new Error('Sesión expirada');
+  }
   if (r.status === 204) return null;
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
@@ -441,6 +445,14 @@ function bindSeg(id, get, set) {
 }
 bindSeg('#statusSeg', () => state.filter.status, (v) => { state.filter.status = v; });
 bindSeg('#viewSeg', () => state.view, (v) => { state.view = v; });
+
+$('#logoutBtn').addEventListener('click', async () => {
+  try {
+    await fetch('/api/logout', { method: 'POST' });
+  } finally {
+    location.replace('/login.html');
+  }
+});
 
 load();
 setInterval(load, 5000);

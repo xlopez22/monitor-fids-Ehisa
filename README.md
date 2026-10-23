@@ -1,6 +1,6 @@
 # FIDS Monitor
 
-Panel web local para ver de un vistazo los reproductores FIDS (SAP-CK, GATE, BAGS, LEDS, TOTE, VWAL, GENA, OPSC, VIPL, SPAR, DSEAL…) y abrir cualquiera en vivo desde el navegador, sin instalar nada en los equipos: usa el UltraVNC que ya tienen (puerto 5900).
+Panel web local para ver de un vistazo los reproductores FIDS (SAP-CK, GATE, BAGS, LEDS, TOTE, VWAL, GENA, OPSC, VIPL, SPAR, DSEAL…) y abrir cualquiera en vivo desde el navegador, sin instalar nada en los equipos: usa el UltraVNC que ya tienen (puerto 5900). Pide una contraseña local (una por instalación) antes de mostrar el tablero o el visor.
 
 ## Qué hace
 
@@ -41,20 +41,32 @@ Requiere Docker Desktop.
 copy .env.example .env
 ```
 
-Edita `.env` y pon la contraseña VNC general en `VNC_PASSWORD=`. Luego:
+Edita `.env` y pon la contraseña VNC general en `VNC_PASSWORD=`. Después configura la contraseña del panel (mínimo 12 caracteres):
+
+```
+npm run set-password
+```
+
+Si no tienes Node.js instalado, puedes generarla con un contenedor temporal:
+
+```
+docker run --rm -it -v "${PWD}:/app" -w /app node:22 node scripts/set-password.js
+```
+
+Luego:
 
 ```
 docker compose up -d --build
 ```
 
-Abre http://127.0.0.1:8080.
+Abre http://127.0.0.1:8080 e introduce la contraseña del panel.
 
 - El contenedor se reinicia solo con Docker (`restart: unless-stopped`).
 - El inventario vive en el volumen de Docker `fids-data` (montado en `/app/data`). La primera vez se llena con `data/inventory.json` de esta carpeta; después guarda lo que agregues, edites o importes. Sobrevive a `docker compose down` y a reconstruir la imagen. Solo se borra con `docker compose down -v`.
 - Ver registros: `docker compose logs -f`
 - Detener: `docker compose down`
 - Copia de seguridad del inventario: `docker cp fids-monitor:/app/data/inventory.json respaldo.json`
-- Solo es accesible desde esta PC (`127.0.0.1:8080`). Para abrirlo a otras PCs de la red, cambia el puerto en `docker-compose.yml` a `"8080:8080"`. Ojo: cualquiera que lo abra podrá ver y controlar los equipos.
+- Solo es accesible desde esta PC (`127.0.0.1:8080`). Para abrirlo a otras PCs de la red, cambia el puerto en `docker-compose.yml` a `"8080:8080"` y agrega el host/origen usado en `APP_HOSTS` y `APP_ORIGINS`. Sin HTTPS, la contraseña y la sesión viajan sin cifrar: para la LAN es recomendable ponerlo detrás de un reverse proxy con TLS y activar `COOKIE_SECURE=true`.
 
 ## Sin Docker
 
@@ -63,10 +75,11 @@ Node.js 18 o superior.
 ```
 npm install
 copy .env.example .env
+npm run set-password
 npm start
 ```
 
-Para importar el Excel por línea de comandos: `npm run import -- "C:\ruta\inventario.xlsx"`.
+`set-password` pide la contraseña dos veces y guarda solo su hash scrypt y un `SESSION_SECRET` en `.env`. Si la olvidas, vuelve a ejecutarlo; las sesiones abiertas se invalidan. Para importar el Excel por línea de comandos: `npm run import -- "C:\ruta\inventario.xlsx"`.
 
 ## Cómo funciona
 
@@ -79,6 +92,12 @@ Para importar el Excel por línea de comandos: `npm run import -- "C:\ruta\inven
 
 | Variable | Defecto | Uso |
 |---|---|---|
+| `AUTH_PASSWORD_HASH` | — | Hash scrypt de la contraseña del panel; lo genera `npm run set-password` |
+| `SESSION_SECRET` | — | Secreto para firmar la cookie de sesión; lo genera `npm run set-password` |
+| `APP_HOSTS` | `127.0.0.1:PORT,localhost:PORT` | Hosts permitidos en la cabecera `Host` (separados por coma) |
+| `APP_ORIGINS` | `http://127.0.0.1:PORT,http://localhost:PORT` | Orígenes permitidos para peticiones y WebSocket (separados por coma) |
+| `COOKIE_SECURE` | `false` | `true` si el panel va detrás de HTTPS |
+| `TRUST_PROXY` | `false` | `1` si hay un reverse proxy delante |
 | `VNC_PASSWORD` | — | Contraseña VNC general (máx. 8 caracteres efectivos) |
 | `PORT` / `HOST` | 8080 / 127.0.0.1 | Dónde escucha el panel (en Docker, `HOST` es 0.0.0.0) |
 | `VNC_PORT` | 5900 | Puerto VNC por defecto (cada equipo puede tener otro) |
@@ -92,6 +111,8 @@ Para importar el Excel por línea de comandos: `npm run import -- "C:\ruta\inven
 
 ## Notas
 
+- El panel usa una sola contraseña por instalación, sin usuarios ni roles. La cookie de sesión es `HttpOnly` y `SameSite=Strict`, y las peticiones/WebSocket se validan contra `Host` y `Origin`. El servidor no arranca hasta que exista `AUTH_PASSWORD_HASH` y `SESSION_SECRET`.
+- Usa siempre el mismo nombre para abrir el panel (`localhost` o `127.0.0.1`): la cookie de sesión no se comparte entre ambos.
 - La autenticación VNC usa DES, que Node 17+ ya no trae activo: por eso se arranca con `--openssl-legacy-provider`.
 - VNC clásico no cifra la imagen. Va dentro de la VLAN y el panel solo es accesible desde esta PC.
 - Las contraseñas propias de cada equipo se guardan en texto plano en `inventory.json` (dentro del volumen).
@@ -110,3 +131,5 @@ En otra terminal (PowerShell):
 ```
 $env:VNC_PORT='5901'; $env:VNC_PASSWORD='claveprueba'; $env:INVENTORY_FILE='test/inventory.test.json'; $env:PORT='8099'; npm start
 ```
+
+El login de prueba usa la misma contraseña configurada con `npm run set-password`. Si fijaste `APP_HOSTS`/`APP_ORIGINS` para el puerto 8080, agrega también `127.0.0.1:8099` o usa el puerto normal.

@@ -10,10 +10,12 @@ const { bridge } = require('./lib/vnc-proxy');
 const { Store } = require('./lib/store');
 const { parseWorkbook, GROUPS } = require('./lib/excel');
 const { scanSubnet } = require('./lib/scan');
+const { createAuth } = require('./lib/auth');
 
+const port = Number(process.env.PORT) || 8080;
 const cfg = {
   host: process.env.HOST || '127.0.0.1',
-  port: Number(process.env.PORT) || 8080,
+  port,
   vncPort: Number(process.env.VNC_PORT) || 5900,
   vncPassword: process.env.VNC_PASSWORD || '',
   roundSeconds: Number(process.env.ROUND_SECONDS) || 90,
@@ -23,7 +25,32 @@ const cfg = {
   ngClientKill: process.env.NG_CLIENT_KILL || 'taskkill /f /im ng-client.exe',
   ngClientStart: process.env.NG_CLIENT_START || 'c:\\dds\\ng-client\\ng-client.exe --fids-allow-invalid-cert',
   inventory: process.env.INVENTORY_FILE || path.join(__dirname, 'data', 'inventory.json'),
+  authHash: process.env.AUTH_PASSWORD_HASH || '',
+  sessionSecret: process.env.SESSION_SECRET || '',
+  cookieSecure: /^(1|true|yes)$/i.test(process.env.COOKIE_SECURE || ''),
+  trustProxy: /^(1|true|yes)$/i.test(process.env.TRUST_PROXY || ''),
+  // Hosts/orígenes que el navegador puede usar. En local son 127.0.0.1 y localhost.
+  // Si se abre por la LAN o detrás de un proxy, hay que agregarlos en .env.
+  appHosts: (process.env.APP_HOSTS || `127.0.0.1:${port},localhost:${port}`)
+    .split(',').map((s) => s.trim()).filter(Boolean),
+  appOrigins: (process.env.APP_ORIGINS || `http://127.0.0.1:${port},http://localhost:${port}`)
+    .split(',').map((s) => s.trim()).filter(Boolean),
 };
+
+let auth;
+try {
+  auth = createAuth({
+    passwordHash: cfg.authHash,
+    sessionSecret: cfg.sessionSecret,
+    hosts: cfg.appHosts,
+    origins: cfg.appOrigins,
+    secureCookie: cfg.cookieSecure,
+  });
+} catch (e) {
+  console.error(`No se puede iniciar el login: ${e.message}`);
+  console.error('Configura el acceso con: npm run set-password');
+  process.exit(1);
+}
 
 // La autenticación VNC usa DES, que Node 17+ solo trae con el proveedor "legacy" de OpenSSL
 try {
@@ -51,7 +78,18 @@ loadDesktopRefs();
 const proxyErrors = {}; // ip -> último error del visor en vivo
 
 const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', cfg.trustProxy ? 1 : false);
 app.use(express.json());
+app.use(auth.sessionParser);
+app.use(auth.originGuard);
+
+// Rutas públicas del login. El resto del panel queda detrás de requireAuth.
+app.post('/api/login', auth.loginLimiter, auth.login);
+app.post('/api/logout', auth.logout);
+app.get('/api/session', auth.sessionInfo);
+
+app.use(auth.requireAuth);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/novnc', express.static(path.join(__dirname, 'node_modules', '@novnc', 'novnc')));
 
@@ -199,19 +237,26 @@ const wss = new WebSocketServer({
 });
 
 server.on('upgrade', (req, socket, head) => {
-  const m = /^\/ws\/([\d.]+)$/.exec(req.url);
-  const d = m && store.get(m[1]);
-  // Solo se permite conectar a equipos del inventario: no es un proxy abierto
-  if (!d) return socket.destroy();
-  delete proxyErrors[d.ip];
-  wss.handleUpgrade(req, socket, head, (ws) => {
-    bridge(ws, {
-      host: d.ip,
-      port: d.port || cfg.vncPort,
-      password: d.password || cfg.vncPassword,
-      onError: (why) => { proxyErrors[d.ip] = friendly(why); },
+  // El upgrade no pasa por Express: se validan Host/Origin y la sesión aquí.
+  if (!auth.isAllowedHost(req.headers.host) || !auth.isAllowedOrigin(req.headers.origin)) {
+    return socket.destroy();
+  }
+  auth.loadSession(req).then((session) => {
+    if (!session?.authenticated) return socket.destroy();
+    const m = /^\/ws\/([\d.]+)$/.exec(req.url);
+    const d = m && store.get(m[1]);
+    // Solo se permite conectar a equipos del inventario: no es un proxy abierto
+    if (!d) return socket.destroy();
+    delete proxyErrors[d.ip];
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      bridge(ws, {
+        host: d.ip,
+        port: d.port || cfg.vncPort,
+        password: d.password || cfg.vncPassword,
+        onError: (why) => { proxyErrors[d.ip] = friendly(why); },
+      });
     });
-  });
+  }).catch(() => socket.destroy());
 });
 
 server.listen(cfg.port, cfg.host, () => {

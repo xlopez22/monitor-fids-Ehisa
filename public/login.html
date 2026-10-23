@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Acceso — FIDS Monitor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="loginBody">
+  <main class="loginCard">
+    <h1>FIDS Monitor</h1>
+    <p class="muted loginIntro">Acceso restringido. Introduce la contraseña de esta instalación.</p>
+    <form id="loginForm">
+      <label>Contraseña
+        <input type="password" name="password" autocomplete="current-password" required autofocus>
+      </label>
+      <p id="loginErr" class="formErr" hidden></p>
+      <button type="submit" class="primary" id="loginBtn">Entrar</button>
+    </form>
+    <p class="muted small">La contraseña se configura con <code>npm run set-password</code>.</p>
+  </main>
+  <script src="login.js"></script>
+</body>
+</html>
