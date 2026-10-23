@@ -41,8 +41,19 @@ function toast(msg, isError = false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.hidden = true; }, 4000);
 }
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 async function api(method, url, body, raw = false) {
   const opts = { method, headers: {} };
+  // CSRF token para métodos mutantes
+  const mutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method.toUpperCase());
+  if (mutating) {
+    const csrf = getCookie('fids.csrf');
+    if (csrf) opts.headers['X-CSRF-Token'] = csrf;
+  }
   if (body !== undefined) {
     if (raw) { opts.body = body; opts.headers['Content-Type'] = 'application/octet-stream'; }
     else { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
@@ -51,6 +62,15 @@ async function api(method, url, body, raw = false) {
   if (r.status === 401) {
     location.replace('/login.html');
     throw new Error('Sesión expirada');
+  }
+  if (r.status === 403) {
+    const data = await r.json().catch(() => ({}));
+    if (data.error?.includes('CSRF')) {
+      // Token expirado: recargar para obtener uno nuevo
+      location.reload();
+      return;
+    }
+    throw new Error(data.error || 'Prohibido');
   }
   if (r.status === 204) return null;
   const data = await r.json().catch(() => ({}));

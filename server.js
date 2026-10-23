@@ -89,7 +89,17 @@ app.post('/api/login', auth.loginLimiter, auth.login);
 app.post('/api/logout', auth.logout);
 app.get('/api/session', auth.sessionInfo);
 
+// Token CSRF para mutaciones (se renueva en login)
+app.get('/api/csrf-token', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ token: req.session.csrf });
+});
+
+// Token de un solo uso para WebSocket (se pide desde view.html antes de conectar)
+app.get('/api/ws-token', auth.issueWsToken);
+
 app.use(auth.requireAuth);
+app.use(auth.csrfGuard);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/novnc', express.static(path.join(__dirname, 'node_modules', '@novnc', 'novnc')));
 
@@ -237,23 +247,29 @@ const wss = new WebSocketServer({
 });
 
 server.on('upgrade', (req, socket, head) => {
-  // El upgrade no pasa por Express: se validan Host/Origin y la sesión aquí.
+  // El upgrade no pasa por Express: se validan Host/Origin, la sesión y el token WS de un solo uso.
   if (!auth.isAllowedHost(req.headers.host) || !auth.isAllowedOrigin(req.headers.origin)) {
     return socket.destroy();
   }
   auth.loadSession(req).then((session) => {
     if (!session?.authenticated) return socket.destroy();
-    const m = /^\/ws\/([\d.]+)$/.exec(req.url);
-    const d = m && store.get(m[1]);
-    // Solo se permite conectar a equipos del inventario: no es un proxy abierto
-    if (!d) return socket.destroy();
-    delete proxyErrors[d.ip];
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      bridge(ws, {
-        host: d.ip,
-        port: d.port || cfg.vncPort,
-        password: d.password || cfg.vncPassword,
-        onError: (why) => { proxyErrors[d.ip] = friendly(why); },
+    // Validar token WS de un solo uso (?t=...)
+    return auth.consumeWsToken(req).then((ok) => {
+      if (!ok) return socket.destroy();
+      // req.url incluye query string; extraer solo la ruta
+      const urlPath = req.url.split('?')[0];
+      const m = /^\/ws\/([\d.]+)$/.exec(urlPath);
+      const d = m && store.get(m[1]);
+      // Solo se permite conectar a equipos del inventario: no es un proxy abierto
+      if (!d) return socket.destroy();
+      delete proxyErrors[d.ip];
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        bridge(ws, {
+          host: d.ip,
+          port: d.port || cfg.vncPort,
+          password: d.password || cfg.vncPassword,
+          onError: (why) => { proxyErrors[d.ip] = friendly(why); },
+        });
       });
     });
   }).catch(() => socket.destroy());

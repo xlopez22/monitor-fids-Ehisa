@@ -99,7 +99,7 @@
         <div>${seen} Puede estar apagado, sin red o con UltraVNC detenido.</div>
         <div class="row"><button id="tryAnyway">Intentar de todos modos</button><button id="downBack">← Tablero</button></div>
       </div></div>`;
-      $('#tryAnyway').addEventListener('click', connect);
+      $('#tryAnyway').addEventListener('click', () => connect());
       $('#downBack').addEventListener('click', goBack);
     }
 
@@ -120,12 +120,21 @@
       $('#status').className = `status ${cls}`;
     }
 
-    function connect() {
+    async function connect() {
       if (rfb) rfb.disconnect();
       $('#screen').innerHTML = '';
       setStatus('Conectando…');
+      // Pedir token de un solo uso para WebSocket
+      let wsToken = '';
+      try {
+        const r = await fetch('/api/ws-token', { credentials: 'same-origin' });
+        if (r.ok) {
+          const data = await r.json();
+          wsToken = data.token ? `?t=${encodeURIComponent(data.token)}` : '';
+        }
+      } catch { /* sin token: el servidor rechazará la conexión */ }
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      rfb = new RFB($('#screen'), `${proto}://${location.host}/ws/${ip}`, { wsProtocols: ['binary'] });
+      rfb = new RFB($('#screen'), `${proto}://${location.host}/ws/${ip}${wsToken}`, { wsProtocols: ['binary'] });
       rfb.scaleViewport = true;
       rfb.resizeSession = false;
       // Los reproductores FIDS suelen ocultar el cursor: noVNC muestra un punto en su lugar
@@ -422,7 +431,7 @@
       if (document.fullscreenElement) document.exitFullscreen();
       else document.documentElement.requestFullscreen();
     });
-    $('#reconnect').addEventListener('click', connect);
+    $('#reconnect').addEventListener('click', () => connect());
 
     window.addEventListener('beforeunload', releaseAll);
     init();

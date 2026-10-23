@@ -1,6 +1,42 @@
 [
-  { "name": "SAP-CK-01-02", "description": "Check In counters 1 and 2 (prueba)", "maker": "ASUS", "model": "NUC-12-PRO", "ip": "127.0.0.2", "controller": "", "group": "CK", "groupLabel": "Check-in" },
-  { "name": "SAP-CK-03-04", "description": "Check In counters 3 and 4 (prueba)", "maker": "ASUS", "model": "NUC-12-PRO", "ip": "127.0.0.3", "controller": "", "group": "CK", "groupLabel": "Check-in" },
-  { "name": "SAP-GATE-01", "description": "Gate 1 (prueba)", "maker": "ASUS", "model": "NUC-12-PRO", "ip": "127.0.0.4", "controller": "", "group": "GATE", "groupLabel": "Gates" },
-  { "name": "SAP-LEDS-01", "description": "Equipo caído (prueba)", "maker": "DELL", "model": "Precision-7960", "ip": "192.0.2.10", "controller": "", "group": "LEDS", "groupLabel": "Pantallas LED" }
+  {
+    "name": "SAP-CK-01-02",
+    "description": "Check In counters 1 and 2 (prueba)",
+    "maker": "ASUS",
+    "model": "NUC-12-PRO",
+    "ip": "127.0.0.2",
+    "controller": "",
+    "group": "CK",
+    "groupLabel": "Check-in"
+  },
+  {
+    "name": "SAP-CK-03-04",
+    "description": "Check In counters 3 and 4 (prueba)",
+    "maker": "ASUS",
+    "model": "NUC-12-PRO",
+    "ip": "127.0.0.3",
+    "controller": "",
+    "group": "CK",
+    "groupLabel": "Check-in"
+  },
+  {
+    "name": "SAP-GATE-01",
+    "description": "Gate 1 (prueba)",
+    "maker": "ASUS",
+    "model": "NUC-12-PRO",
+    "ip": "127.0.0.4",
+    "controller": "",
+    "group": "GATE",
+    "groupLabel": "Gates"
+  },
+  {
+    "name": "SAP-LEDS-01",
+    "description": "Equipo caído (prueba)",
+    "maker": "DELL",
+    "model": "Precision-7960",
+    "ip": "192.0.2.10",
+    "controller": "",
+    "group": "LEDS",
+    "groupLabel": "Pantallas LED"
+  }
 ]
