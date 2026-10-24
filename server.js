@@ -125,7 +125,7 @@ const viewers = new ViewerControl(); // conexiones de visor y su modo solo lectu
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', cfg.trustProxy ? 1 : false);
-app.use(express.json());
+app.use(express.json({ limit: '64kb' }));
 app.use(auth.sessionParser);
 app.use(auth.originGuard);
 
@@ -174,6 +174,7 @@ app.post('/api/devices/:ip/control', h(async (req, res) => {
   const d = store.get(req.params.ip);
   if (!d) return res.status(404).json({ error: 'Equipo no encontrado' });
   const conn = String(req.body?.conn || '');
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(conn)) return res.status(400).json({ error: 'Conexión de visor inválida' });
   const state = viewers.setReadOnly(conn, { ip: d.ip, sessionID: req.sessionID }, false);
   if (!state) return res.status(409).json({ error: 'La sesión del visor no está activa; recarga la página.' });
   res.set('Cache-Control', 'no-store');
@@ -184,6 +185,7 @@ app.post('/api/devices/:ip/release', h(async (req, res) => {
   const d = store.get(req.params.ip);
   if (!d) return res.status(404).json({ error: 'Equipo no encontrado' });
   const conn = String(req.body?.conn || '');
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(conn)) return res.status(400).json({ error: 'Conexión de visor inválida' });
   viewers.setReadOnly(conn, { ip: d.ip, sessionID: req.sessionID }, true);
   res.set('Cache-Control', 'no-store');
   res.json({ control: false });
@@ -312,8 +314,10 @@ app.get('/thumb/:ip', (req, res) => {
 });
 
 const server = http.createServer(app);
+const MAX_WS_PAYLOAD = 16 * 1024 * 1024 + 1024; // el portapapeles máximo del filtro RFB
 const wss = new WebSocketServer({
   noServer: true,
+  maxPayload: MAX_WS_PAYLOAD,
   handleProtocols: (protocols) => (protocols.has('binary') ? 'binary' : false),
 });
 

@@ -156,6 +156,7 @@ La contraseña VNC (general o por equipo) usa **máximo 8 caracteres**: el panel
 - La autenticación VNC usa DES, que Node 17+ ya no trae activo: por eso se arranca con `--openssl-legacy-provider`. DES sigue existiendo dentro del túnel si activás `VNC_TLS`; TLS protege el transporte, no cambia el login VNC.
 - Sin `VNC_TLS`, VNC clásico no cifra la imagen ni las teclas. Usalo solo en una VLAN aislada y con el 5900 restringido a la PC del panel.
 - Las contraseñas propias de cada equipo se guardan cifradas con AES-256-GCM (`enc:v1:...`) en `inventory.json`; la clave vive solo en `.env` (`DATA_ENCRYPTION_KEY`). Los inventarios viejos en texto plano se cifran solos en la primera carga.
+- El parser de capturas RFB tiene límites defensivos: resolución máxima 8192×8192 y 16 Mpx, nombre de escritorio 4 KB, texto del servidor 1 MB, 4096 rectángulos por cuadro, 32 MB de ZRLE comprimido y 4×píxeles al descomprimir. Un equipo que anuncie algo mayor falla esa ronda en vez de reservar memoria por el tamaño anunciado. Los WebSocket del visor aceptan frames de hasta 16 MB y el JSON de la API hasta 64 KB.
 - `.env`, `data/` y `certs/` están en `.gitignore`: si el repo se publica en GitHub, no los agregues con `git add -f`.
 - Los video walls (Optiplex) a veces tardan más de 20 s en entregar el cuadro y fallan una ronda; se recuperan en la siguiente.
 
