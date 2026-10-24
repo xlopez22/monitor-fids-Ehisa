@@ -84,6 +84,31 @@
     let rfb;
     let device = null;
     let remoteClipboardSeen = false; // ¿UltraVNC ya mandó algo de su portapapeles en esta sesión?
+    let connId = '';                 // id de esta conexión de visor, para pedir el control
+    let controlling = false;
+    let switchingControl = false;
+    let controlOp = 0;               // invalida respuestas viejas si la conexión cambia
+
+    function newConnId() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+    }
+    function cookie(name) {
+      const part = document.cookie.split('; ').find((c) => c.startsWith(`${name}=`));
+      return part ? decodeURIComponent(part.slice(name.length + 1)) : '';
+    }
+    async function postJson(url, body) {
+      const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': cookie('fids.csrf') },
+        body: JSON.stringify(body || {}),
+      });
+      let data = {};
+      try { data = await res.json(); } catch { /* respuesta sin JSON */ }
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+      return data;
+    }
 
     const ago = (ts) => {
       const s = Math.round((Date.now() - ts) / 1000);
@@ -124,27 +149,42 @@
       if (rfb) rfb.disconnect();
       $('#screen').innerHTML = '';
       setStatus('Conectando…');
+      // Cada conexión tiene su propio id: el servidor la registra en solo lectura.
+      connId = newConnId();
+      controlOp++;
+      switchingControl = false;
+      controlling = false;
+      setFast(false);
+      const controlBtn = $('#control');
+      controlBtn.classList.remove('active');
+      controlBtn.textContent = 'Tomar control';
+      controlBtn.disabled = false;
       // Pedir token de un solo uso para WebSocket
       let wsToken = '';
       try {
         const r = await fetch('/api/ws-token', { credentials: 'same-origin' });
         if (r.ok) {
           const data = await r.json();
-          wsToken = data.token ? `?t=${encodeURIComponent(data.token)}` : '';
+          wsToken = data.token || '';
         }
       } catch { /* sin token: el servidor rechazará la conexión */ }
+      const qs = new URLSearchParams({ conn: connId });
+      if (wsToken) qs.set('t', wsToken);
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      rfb = new RFB($('#screen'), `${proto}://${location.host}/ws/${ip}${wsToken}`, { wsProtocols: ['binary'] });
-      rfb.scaleViewport = true;
-      rfb.resizeSession = false;
+      const thisRfb = new RFB($('#screen'), `${proto}://${location.host}/ws/${ip}?${qs}`, { wsProtocols: ['binary'] });
+      rfb = thisRfb;
+      thisRfb.scaleViewport = true;
+      thisRfb.resizeSession = false;
       // Los reproductores FIDS suelen ocultar el cursor: noVNC muestra un punto en su lugar
-      rfb.showDotCursor = true;
-      rfb.viewOnly = !$('#control').classList.contains('active');
-      rfb.qualityLevel = Number($('#quality').value);
-      rfb.compressionLevel = Number($('#compression').value);
-      rfb.addEventListener('connect', () => setStatus('Conectado', 'ok'));
+      thisRfb.showDotCursor = true;
+      // El servidor arranca siempre en solo lectura; el control se pide aparte.
+      thisRfb.viewOnly = true;
+      thisRfb.qualityLevel = Number($('#quality').value);
+      thisRfb.compressionLevel = Number($('#compression').value);
+      thisRfb.addEventListener('connect', () => { if (rfb === thisRfb) setStatus('Conectado', 'ok'); });
       // Texto copiado en el equipo remoto -> portapapeles de esta PC
-      rfb.addEventListener('clipboard', async (e) => {
+      thisRfb.addEventListener('clipboard', async (e) => {
+        if (rfb !== thisRfb) return;
         const text = e.detail.text;
         remoteClipboardSeen = true;
         try {
@@ -154,8 +194,17 @@
           hint('El equipo copió texto, pero el navegador no dejó pasarlo a tu PC: haz clic en esta ventana y vuelve a copiar.', true);
         }
       });
-      rfb.addEventListener('disconnect', async (e) => {
+      thisRfb.addEventListener('disconnect', async (e) => {
+        if (rfb !== thisRfb) return;
+        controlOp++;
+        switchingControl = false;
         releaseAll();
+        controlling = false;
+        if (navigator.keyboard?.unlock) navigator.keyboard.unlock();
+        setFast(false);
+        controlBtn.classList.remove('active');
+        controlBtn.textContent = 'Tomar control';
+        controlBtn.disabled = false;
         if (leaving) return;
         if (e.detail.clean) return setStatus('Desconectado', 'bad');
         // El servidor guarda el motivo (contraseña, bloqueo, equipo apagado…)
@@ -183,31 +232,87 @@
       $('#hint').hidden = !text;
     }
 
-    // Tomar control = pantalla completa + bloqueo de teclado. Es la única forma en que el navegador
-    // entrega a la página la tecla Windows, Alt+Tab, Esc, etc. (Chrome/Edge, en 127.0.0.1 o https).
-    let controlling = false;
+    // Tomar control = permiso del servidor + pantalla completa + bloqueo de teclado.
+    // El servidor arranca en solo lectura y solo habilita teclado/ratón/pegado tras el POST.
     async function setControl(on) {
-      controlling = on;
+      if (switchingControl || !rfb || on === controlling) return;
+      const op = ++controlOp;
+      switchingControl = true;
+      const targetRfb = rfb;
+      const targetConn = connId;
       const btn = $('#control');
-      btn.classList.toggle('active', on);
-      btn.textContent = on ? 'Controlando (soltar)' : 'Tomar control';
-      if (!on) releaseAll(); // antes de pasar a solo observar (en solo observar sendKey no envía)
-      if (rfb) rfb.viewOnly = !on;
-      if (!on) {
+      btn.disabled = true;
+      // Si la conexión o el intento cambiaron mientras esperábamos, no tocar el estado nuevo.
+      const current = () => op === controlOp && rfb === targetRfb && connId === targetConn;
+
+      if (on) {
+        // Pantalla completa y bloqueo de teclado en el mismo gesto del click, antes de
+        // esperar la respuesta del servidor.
+        let locked = false;
+        try {
+          if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+        } catch { /* sin pantalla completa */ }
+        try {
+          if (navigator.keyboard?.lock) { await navigator.keyboard.lock(); locked = true; }
+        } catch { /* sin bloqueo de teclado */ }
+        if (!current()) return;
+
+        btn.textContent = 'Conectando control…';
+        try {
+          await postJson(`/api/devices/${ip}/control`, { conn: targetConn });
+          if (!current()) {
+            // El permiso se concedió a una conexión que ya no es la actual: revocarlo.
+            postJson(`/api/devices/${ip}/release`, { conn: targetConn }).catch(() => {});
+            return;
+          }
+          controlling = true;
+          rfb.viewOnly = false;
+          btn.classList.add('active');
+          btn.textContent = 'Controlando (soltar)';
+          setFast(true);
+          rfb.focus();
+          hint(locked
+            ? 'Controlando: todas las teclas (Windows, Alt+Tab, Esc…) van al equipo remoto. Para salir del control mantén presionada Esc o pulsa "Controlando (soltar)".'
+            : 'Controlando. Este navegador no permite capturar la tecla Windows ni Alt+Tab: usa los botones ⊞ Win, Alt+Tab, Esc de la barra.', !locked);
+        } catch (e) {
+          if (!current()) return;
+          controlling = false;
+          rfb.viewOnly = true;
+          btn.classList.remove('active');
+          btn.textContent = 'Tomar control';
+          if (navigator.keyboard?.unlock) navigator.keyboard.unlock();
+          if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+          setFast(false);
+          hint(`No se pudo tomar control: ${e.message}`, true);
+        }
+      } else {
+        // Primero los key-up, mientras el servidor todavía acepta entrada.
+        releaseAll();
+        controlling = false;
+        rfb.viewOnly = true;
+        btn.classList.remove('active');
+        btn.textContent = 'Tomar control';
+        let failed = false;
+        try {
+          await postJson(`/api/devices/${ip}/release`, { conn: targetConn });
+        } catch {
+          failed = true;
+        }
+        if (!current()) return;
+        if (failed) {
+          // Si no se pudo confirmar, cerrar la conexión revoca el control igual.
+          try { rfb.disconnect(); } catch { /* ya cerrado */ }
+          hint('No se pudo confirmar la liberación; se cerró el visor para revocar el control.', true);
+        }
         if (navigator.keyboard?.unlock) navigator.keyboard.unlock();
         if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
-        hint('');
-        return;
+        setFast(false);
+        if (!failed) hint('');
       }
-      let locked = false;
-      try {
-        if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
-        if (navigator.keyboard?.lock) { await navigator.keyboard.lock(); locked = true; }
-      } catch { /* sin pantalla completa o sin bloqueo */ }
-      if (rfb) rfb.focus();
-      hint(locked
-        ? 'Controlando: todas las teclas (Windows, Alt+Tab, Esc…) van al equipo remoto. Para salir del control mantén presionada Esc o pulsa "Controlando (soltar)".'
-        : 'Controlando. Este navegador no permite capturar la tecla Windows ni Alt+Tab: usa los botones ⊞ Win, Alt+Tab, Esc de la barra.', !locked);
+
+      if (!current()) return;
+      switchingControl = false;
+      btn.disabled = false;
     }
     // Puntero grande: noVNC pone el cursor remoto como estilo en línea del canvas (o un punto de 3 px
     // si el reproductor lo oculta). Una regla CSS con !important lo reemplaza por una flecha visible.
@@ -269,9 +374,7 @@
     $('#fast').addEventListener('click', () => setFast(normal === null));
 
     $('#control').addEventListener('click', () => {
-      const on = !controlling;
-      setFast(on);
-      setControl(on);
+      setControl(!controlling);
     });
     // Al salir de pantalla completa (Esc sostenido) se suelta el control
     document.addEventListener('fullscreenchange', () => {

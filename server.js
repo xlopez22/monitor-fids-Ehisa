@@ -13,6 +13,7 @@ const { scanSubnet } = require('./lib/scan');
 const { createAuth } = require('./lib/auth');
 const { isValidDataEncryptionKey } = require('./lib/password-enc');
 const { loadCa } = require('./lib/vnc-connect');
+const { ViewerControl } = require('./lib/viewer-control');
 
 const port = Number(process.env.PORT) || 8080;
 const cfg = {
@@ -119,6 +120,7 @@ const loadDesktopRefs = () => {
 };
 loadDesktopRefs();
 const proxyErrors = {}; // ip -> último error del visor en vivo
+const viewers = new ViewerControl(); // conexiones de visor y su modo solo lectura/control
 
 const app = express();
 app.disable('x-powered-by');
@@ -165,6 +167,27 @@ function currentSig(ip) {
 
 // Envuelve handlers async para responder errores como JSON
 const h = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((e) => res.status(400).json({ error: e.message }));
+
+// Permiso de control del visor: el WebSocket arranca en solo lectura y solo se
+// habilita la entrada tras este POST autenticado y con CSRF.
+app.post('/api/devices/:ip/control', h(async (req, res) => {
+  const d = store.get(req.params.ip);
+  if (!d) return res.status(404).json({ error: 'Equipo no encontrado' });
+  const conn = String(req.body?.conn || '');
+  const state = viewers.setReadOnly(conn, { ip: d.ip, sessionID: req.sessionID }, false);
+  if (!state) return res.status(409).json({ error: 'La sesión del visor no está activa; recarga la página.' });
+  res.set('Cache-Control', 'no-store');
+  res.json({ control: true });
+}));
+
+app.post('/api/devices/:ip/release', h(async (req, res) => {
+  const d = store.get(req.params.ip);
+  if (!d) return res.status(404).json({ error: 'Equipo no encontrado' });
+  const conn = String(req.body?.conn || '');
+  viewers.setReadOnly(conn, { ip: d.ip, sessionID: req.sessionID }, true);
+  res.set('Cache-Control', 'no-store');
+  res.json({ control: false });
+}));
 
 app.get('/api/devices', (req, res) => {
   res.json({
@@ -301,17 +324,21 @@ server.on('upgrade', (req, socket, head) => {
   }
   auth.loadSession(req).then((session) => {
     if (!session?.authenticated) return socket.destroy();
+    // req.url incluye query string; extraer la ruta y el id de esta conexión de visor
+    const query = new URLSearchParams((req.url || '').split('?')[1] || '');
+    const conn = query.get('conn') || '';
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(conn)) return socket.destroy();
+    const urlPath = req.url.split('?')[0];
+    const m = /^\/ws\/([\d.]+)$/.exec(urlPath);
+    const d = m && store.get(m[1]);
+    // Solo se permite conectar a equipos del inventario: no es un proxy abierto
+    if (!d) return socket.destroy();
     // Validar token WS de un solo uso (?t=...)
     return auth.consumeWsToken(req).then((ok) => {
       if (!ok) return socket.destroy();
-      // req.url incluye query string; extraer solo la ruta
-      const urlPath = req.url.split('?')[0];
-      const m = /^\/ws\/([\d.]+)$/.exec(urlPath);
-      const d = m && store.get(m[1]);
-      // Solo se permite conectar a equipos del inventario: no es un proxy abierto
-      if (!d) return socket.destroy();
       delete proxyErrors[d.ip];
       wss.handleUpgrade(req, socket, head, (ws) => {
+        const state = viewers.register(conn, { ip: d.ip, sessionID: req.sessionID, ws });
         bridge(ws, {
           host: d.ip,
           port: d.port || cfg.vncPort,
@@ -320,7 +347,10 @@ server.on('upgrade', (req, socket, head) => {
           tlsCa: vncTlsCa,
           tlsInsecure: cfg.vncTlsInsecure,
           tlsServername: cfg.vncTlsServername,
+          readOnly: true,
+          controlState: state,
           onError: (why) => { proxyErrors[d.ip] = friendly(why); },
+          onClose: () => viewers.remove(conn, state),
         });
       });
     });

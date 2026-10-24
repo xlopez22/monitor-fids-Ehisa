@@ -24,10 +24,10 @@ Panel web local para ver de un vistazo los reproductores FIDS (SAP-CK, GATE, BAG
 
 **Visor en vivo** (clic en la miniatura o el nombre)
 - **← Tablero** cierra la sesión y vuelve (**Alt+←** solo cuando no estás controlando).
-- Solo observar por defecto. **Tomar control** pone pantalla completa con bloqueo de teclado: todas las teclas (Windows, Alt+Tab, Esc…) van al equipo. Para soltar: mantener Esc o el botón. Al tomar control se activa **⚡ Rápido** (calidad 1, compresión 9); el mismo botón vuelve a calidad normal.
+- **Solo observar por defecto**, y lo impone el servidor: el visor nace en solo lectura y descarta teclado, ratón y portapapeles. **Tomar control** pide permiso al servidor (POST autenticado y con CSRF, ligado a esta sesión y a esta conexión WebSocket) y, si lo concede, pone pantalla completa con bloqueo de teclado: todas las teclas (Windows, Alt+Tab, Esc…) van al equipo. Para soltar: mantener Esc o el botón. Al tomar control se activa **⚡ Rápido** (calidad 1, compresión 9); el mismo botón vuelve a calidad normal. Al soltar, cerrar o recargar vuelve a solo lectura.
 - **Ctrl / Alt / Shift / ⊞** se quedan presionados con un clic y se sueltan con otro (para Ctrl+clic, etc.). Se sueltan solos al soltar el control o salir.
 - Atajos: ⊞ Win, Alt+Tab, Esc, Ctrl+Esc, Ctrl+C, Ctrl+V, Ctrl+Alt+Supr.
-- **Copiar y pegar** (solo texto): lo que copias en el equipo llega a tu portapapeles; Ctrl+V (tecla o botón) pega en el equipo lo que copiaste en tu PC. Chrome pide permiso de portapapeles la primera vez. Depende de que UltraVNC tenga activada la transferencia de portapapeles en ese equipo.
+- **Copiar y pegar** (solo texto): lo que copias en el equipo llega a tu portapapeles, también en solo observar. Pegar en el equipo (Ctrl+V o el botón) solo funciona con control activo. Chrome pide permiso de portapapeles la primera vez. Depende de que UltraVNC tenga activada la transferencia de portapapeles en ese equipo.
 - **↻ NG-Client** (en modo control, con confirmación): usa Ejecutar (Win+R) dos veces. Primero `NG_CLIENT_KILL` (`taskkill /f /im ng-client.exe`) y luego `NG_CLIENT_START` (`c:\dds\ng-client\ng-client.exe --fids-allow-invalid-cert`), igual que "START DDS CLIENT". La orden se **teclea** (no se pega), porque el portapapeles de UltraVNC no siempre pasa, y antes se borra lo que tuviera Ejecutar, así nunca se lanza una orden vieja. Probado en SAP-OPSC-04 (22/10/2026): NG-Client volvió a pantalla completa.
 - **Puntero**: Del equipo / Flecha (22 px, por defecto) / Grande (30) / Muy grande (40).
 - Calidad y compresión ajustables, pantalla completa, reconectar.
@@ -85,7 +85,7 @@ npm start
 
 - **Una sesión por equipo y ronda.** Cada `ROUND_SECONDS` (90 s) se abre una sesión VNC normal, compartida y de solo lectura con cada equipo, de a `CONCURRENCY` (6) a la vez. Si el puerto abre, el equipo está en línea, y en esa misma sesión se pide un cuadro completo que se reduce a JPEG. Una ronda de ~96 equipos tarda ~50 s.
 - **Sin sondeos sueltos al puerto 5900.** UltraVNC cuenta como intento fallido cada conexión que se cierra sin autenticar, y después de varios bloquea un rato la IP con *"Your connection has been rejected."*. Por eso el estado sale de la misma sesión que toma la miniatura. El ping tampoco sirve: el firewall de Windows de los equipos no responde ICMP. "Buscar equipos nuevos" sí hace un intento TCP por IP, pero solo cuando lo pides.
-- **Visor en vivo**: el navegador habla con este servidor por WebSocket (`/ws/<ip>`) y el servidor con el equipo por TCP. Las contraseñas se usan solo en el servidor; el navegador nunca las ve y la API solo dice si un equipo tiene contraseña propia. Solo se permiten IPs del inventario.
+- **Visor en vivo**: el navegador habla con este servidor por WebSocket (`/ws/<ip>?conn=<id>`) y el servidor con el equipo por TCP. Las contraseñas se usan solo en el servidor; el navegador nunca las ve y la API solo dice si un equipo tiene contraseña propia. Solo se permiten IPs del inventario. El visor arranca en solo lectura y el servidor filtra los mensajes RFB: teclado, ratón y portapapeles solo se reenvían mientras esa conexión tiene control.
 - Las sesiones son **compartidas**: no desconectan a otros que estén mirando con UltraVNC.
 
 ## VNC seguro (TLS)
@@ -151,6 +151,7 @@ La contraseña VNC (general o por equipo) usa **máximo 8 caracteres**: el panel
 ## Notas
 
 - El panel usa una sola contraseña por instalación, sin usuarios ni roles. La cookie de sesión es `HttpOnly` y `SameSite=Strict`, y las peticiones/WebSocket se validan contra `Host` y `Origin`. El servidor no arranca hasta que existan `AUTH_PASSWORD_HASH`, `SESSION_SECRET` y `DATA_ENCRYPTION_KEY`.
+- El visor arranca siempre en solo lectura. El servidor descarta teclado, ratón, portapapeles y extensiones peligrosas hasta que la misma sesión pide control con `POST /api/devices/:ip/control` (con CSRF) para una conexión WebSocket viva; al soltar, cerrar o recargar vuelve a solo lectura.
 - Usa siempre el mismo nombre para abrir el panel (`localhost` o `127.0.0.1`): la cookie de sesión no se comparte entre ambos.
 - La autenticación VNC usa DES, que Node 17+ ya no trae activo: por eso se arranca con `--openssl-legacy-provider`. DES sigue existiendo dentro del túnel si activás `VNC_TLS`; TLS protege el transporte, no cambia el login VNC.
 - Sin `VNC_TLS`, VNC clásico no cifra la imagen ni las teclas. Usalo solo en una VLAN aislada y con el 5900 restringido a la PC del panel.
@@ -159,6 +160,12 @@ La contraseña VNC (general o por equipo) usa **máximo 8 caracteres**: el panel
 - Los video walls (Optiplex) a veces tardan más de 20 s en entregar el cuadro y fallan una ronda; se recuperan en la siguiente.
 
 ## Pruebas sin la VLAN
+
+Pruebas automáticas (filtro RFB, registro de control y puente en solo lectura):
+
+```
+npm test
+```
 
 `test/fake-vnc-server.js` simula equipos VNC (cada 127.0.0.x responde como un equipo distinto):
 

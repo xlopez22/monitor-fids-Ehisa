@@ -6,6 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node --openssl-legacy-provider server.js",
+    "test": "node --test test/*.test.js",
     "import": "node scripts/import-inventory.js",
     "set-password": "node scripts/set-password.js"
   },
