@@ -12,6 +12,7 @@ const { parseWorkbook, GROUPS } = require('./lib/excel');
 const { scanSubnet } = require('./lib/scan');
 const { createAuth } = require('./lib/auth');
 const { isValidDataEncryptionKey } = require('./lib/password-enc');
+const { loadCa } = require('./lib/vnc-connect');
 
 const port = Number(process.env.PORT) || 8080;
 const cfg = {
@@ -19,6 +20,10 @@ const cfg = {
   port,
   vncPort: Number(process.env.VNC_PORT) || 5900,
   vncPassword: process.env.VNC_PASSWORD || '',
+  vncTls: /^(1|true|yes)$/i.test(process.env.VNC_TLS || ''),
+  vncTlsCa: process.env.VNC_TLS_CA || '',
+  vncTlsInsecure: /^(1|true|yes)$/i.test(process.env.VNC_TLS_INSECURE || ''),
+  vncTlsServername: process.env.VNC_TLS_SERVERNAME || '',
   roundSeconds: Number(process.env.ROUND_SECONDS) || 90,
   concurrency: Number(process.env.CONCURRENCY) || 6,
   // Lo que teclea el botón "Reiniciar NG-Client" en Ejecutar (Win+R) del equipo remoto, en dos pasos.
@@ -61,6 +66,25 @@ try {
   process.exit(1);
 }
 if (!cfg.vncPassword) console.warn('Aviso: VNC_PASSWORD vacío; solo funcionarán equipos con contraseña propia o sin contraseña.');
+if (cfg.vncPassword.length > 8) console.warn('Aviso: VNC_PASSWORD tiene más de 8 caracteres; el protocolo VNC solo usa los primeros 8.');
+
+// TLS para el tramo panel -> equipo. No cambia el protocolo VNC: se espera un
+// stunnel/gateway TLS delante de cada equipo. Sin esto, RFB viaja en claro.
+let vncTlsCa;
+if (cfg.vncTls) {
+  try {
+    vncTlsCa = loadCa(cfg.vncTlsCa);
+  } catch (e) {
+    console.error(e.message);
+    process.exit(1);
+  }
+  console.log(`VNC sobre TLS activado${cfg.vncTlsCa ? ` (CA: ${cfg.vncTlsCa})` : ' (CA del sistema)'}`);
+  if (cfg.vncTlsInsecure) {
+    console.warn('Aviso: VNC_TLS_INSECURE=1 desactiva la validación del certificado; protege contra sniffing pasivo, no contra MITM.');
+  }
+} else if (cfg.vncTlsCa) {
+  console.warn('Aviso: VNC_TLS_CA está definido pero VNC_TLS no está activado; se ignorará.');
+}
 
 // Las contraseñas VNC por equipo se guardan cifradas en el inventario. Sin esta clave el
 // servidor no puede leerlas ni volver a guardarlas, así que se exige al arrancar.
@@ -85,6 +109,10 @@ const monitor = new Monitor(store.devices, {
   password: cfg.vncPassword,
   intervalMs: cfg.roundSeconds * 1000,
   concurrency: cfg.concurrency,
+  tls: cfg.vncTls,
+  tlsCa: vncTlsCa,
+  tlsInsecure: cfg.vncTlsInsecure,
+  tlsServername: cfg.vncTlsServername,
 });
 const loadDesktopRefs = () => {
   monitor.desktopColors = [...HEALTH.defaultDesktopColors, ...store.settings.desktopRefs.map((r) => r.color).filter(Boolean)];
@@ -227,7 +255,12 @@ app.post('/api/scan', h(async (req, res) => {
     while (queue.length) {
       const ip = queue.shift();
       try {
-        const f = await grabFrame(ip, cfg.vncPort, cfg.vncPassword);
+        const f = await grabFrame(ip, cfg.vncPort, cfg.vncPassword, {
+          tls: cfg.vncTls,
+          tlsCa: vncTlsCa,
+          tlsInsecure: cfg.vncTlsInsecure,
+          tlsServername: cfg.vncTlsServername,
+        });
         const jpeg = await toJpeg(f, 320);
         results.push({ ip, ok: true, resolution: `${f.width}x${f.height}`, thumb: `data:image/jpeg;base64,${jpeg.toString('base64')}` });
       } catch (e) {
@@ -283,6 +316,10 @@ server.on('upgrade', (req, socket, head) => {
           host: d.ip,
           port: d.port || cfg.vncPort,
           password: d.password || cfg.vncPassword,
+          tls: cfg.vncTls,
+          tlsCa: vncTlsCa,
+          tlsInsecure: cfg.vncTlsInsecure,
+          tlsServername: cfg.vncTlsServername,
           onError: (why) => { proxyErrors[d.ip] = friendly(why); },
         });
       });

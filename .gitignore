@@ -6,4 +6,7 @@ data/*
 !data/.gitkeep
 *.tmp
 *.tmp.js
+certs/
+*.key
+*.pem
 Thumbs.db

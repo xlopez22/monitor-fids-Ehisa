@@ -88,6 +88,40 @@ npm start
 - **Visor en vivo**: el navegador habla con este servidor por WebSocket (`/ws/<ip>`) y el servidor con el equipo por TCP. Las contraseñas se usan solo en el servidor; el navegador nunca las ve y la API solo dice si un equipo tiene contraseña propia. Solo se permiten IPs del inventario.
 - Las sesiones son **compartidas**: no desconectan a otros que estén mirando con UltraVNC.
 
+## VNC seguro (TLS)
+
+El VNC clásico **no cifra la pantalla ni las teclas**, y su login usa DES con contraseñas de máximo 8 caracteres. Este panel puede envolver el flujo RFB en TLS si delante de cada equipo hay un `stunnel` (o un gateway TLS equivalente):
+
+- El panel conecta por TLS al mismo host/puerto del inventario.
+- `stunnel` termina TLS y reenvía a UltraVNC en `127.0.0.1:5901`.
+- Dentro del túnel sigue el VNC clásico; TLS protege el tránsito y valida el certificado del equipo.
+
+Ejemplo de `stunnel.conf` en cada equipo FIDS (UltraVNC movido al 5901):
+
+```ini
+[vnc]
+accept = 5900
+connect = 127.0.0.1:5901
+cert = C:\stunnel\fids.pem
+key = C:\stunnel\fids.key
+```
+
+En el panel:
+
+```env
+VNC_TLS=1
+VNC_TLS_CA=C:\fids-monitor\certs\fids-ca.pem
+```
+
+- `VNC_TLS_CA` debe contener la CA que firmó los certificados. Si usás un certificado autofirmado por equipo, podés concatenar todos los `.pem` en un solo archivo.
+- El certificado debe incluir la **IP del equipo** en `subjectAltName` (o usar `VNC_TLS_SERVERNAME` si el certificado usa un nombre).
+- `VNC_TLS_INSECURE=1` desactiva la validación y solo sirve para probar: no protege contra un equipo falso (MITM).
+- En Docker, montá el PEM dentro del contenedor y usá esa ruta, por ejemplo `- ./certs:/app/certs:ro` y `VNC_TLS_CA=/app/certs/fids-ca.pem`.
+
+Si no podés desplegar TLS en los equipos, la alternativa es aislar la VLAN de FIDS y permitir el 5900 **solo** desde la PC del panel; sin eso, cualquiera en la misma red puede ver las pantallas o capturar el handshake VNC.
+
+La contraseña VNC (general o por equipo) usa **máximo 8 caracteres**: el panel rechaza contraseñas más largas al editar un equipo y avisa si `VNC_PASSWORD` es más larga.
+
 ## Configuración (.env)
 
 | Variable | Defecto | Uso |
@@ -100,6 +134,10 @@ npm start
 | `COOKIE_SECURE` | `false` | `true` si el panel va detrás de HTTPS |
 | `TRUST_PROXY` | `false` | `1` si hay un reverse proxy delante |
 | `VNC_PASSWORD` | — | Contraseña VNC general (máx. 8 caracteres efectivos) |
+| `VNC_TLS` | `false` | `true` para conectar al VNC por TLS (stunnel/gateway delante de cada equipo) |
+| `VNC_TLS_CA` | — | Certificado/CA en PEM que valida los certificados de los equipos |
+| `VNC_TLS_INSECURE` | `false` | `true` solo para pruebas: no valida el certificado (pierde protección contra MITM) |
+| `VNC_TLS_SERVERNAME` | — | Nombre del certificado si no coincide con la IP del equipo |
 | `PORT` / `HOST` | 8080 / 127.0.0.1 | Dónde escucha el panel (en Docker, `HOST` es 0.0.0.0) |
 | `VNC_PORT` | 5900 | Puerto VNC por defecto (cada equipo puede tener otro) |
 | `ROUND_SECONDS` | 90 | Cada cuánto se revisan todos los equipos |
@@ -114,9 +152,10 @@ npm start
 
 - El panel usa una sola contraseña por instalación, sin usuarios ni roles. La cookie de sesión es `HttpOnly` y `SameSite=Strict`, y las peticiones/WebSocket se validan contra `Host` y `Origin`. El servidor no arranca hasta que existan `AUTH_PASSWORD_HASH`, `SESSION_SECRET` y `DATA_ENCRYPTION_KEY`.
 - Usa siempre el mismo nombre para abrir el panel (`localhost` o `127.0.0.1`): la cookie de sesión no se comparte entre ambos.
-- La autenticación VNC usa DES, que Node 17+ ya no trae activo: por eso se arranca con `--openssl-legacy-provider`.
-- VNC clásico no cifra la imagen. Va dentro de la VLAN y el panel solo es accesible desde esta PC.
+- La autenticación VNC usa DES, que Node 17+ ya no trae activo: por eso se arranca con `--openssl-legacy-provider`. DES sigue existiendo dentro del túnel si activás `VNC_TLS`; TLS protege el transporte, no cambia el login VNC.
+- Sin `VNC_TLS`, VNC clásico no cifra la imagen ni las teclas. Usalo solo en una VLAN aislada y con el 5900 restringido a la PC del panel.
 - Las contraseñas propias de cada equipo se guardan cifradas con AES-256-GCM (`enc:v1:...`) en `inventory.json`; la clave vive solo en `.env` (`DATA_ENCRYPTION_KEY`). Los inventarios viejos en texto plano se cifran solos en la primera carga.
+- `.env`, `data/` y `certs/` están en `.gitignore`: si el repo se publica en GitHub, no los agregues con `git add -f`.
 - Los video walls (Optiplex) a veces tardan más de 20 s en entregar el cuadro y fallan una ronda; se recuperan en la siguiente.
 
 ## Pruebas sin la VLAN

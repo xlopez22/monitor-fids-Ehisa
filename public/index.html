@@ -51,7 +51,7 @@
         <label>Puerto VNC <input name="port" type="number" min="1" max="65535" placeholder="5900"></label>
       </div>
       <label>Contraseña VNC propia
-        <input name="password" type="password" autocomplete="new-password" placeholder="Vacío = usar la contraseña general">
+        <input name="password" type="password" maxlength="8" autocomplete="new-password" placeholder="Vacío = usar la general (máx. 8)">
       </label>
       <label class="chk" id="clearPwRow" hidden><input type="checkbox" name="clearPassword"> Quitar la contraseña propia (volver a la general)</label>
       <fieldset id="screenRefs" class="refs" hidden>

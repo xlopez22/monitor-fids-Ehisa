@@ -2,6 +2,9 @@
 .env
 .env.*
 data/
+certs/
+*.key
+*.pem
 scripts/*.tmp.js
 
 # Ruido de desarrollo
