@@ -4,10 +4,12 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { hashPassword, generateSessionSecret } = require('../lib/password');
+const { generateDataEncryptionKey, isValidDataEncryptionKey } = require('../lib/password-enc');
 
 const ROOT = path.join(__dirname, '..');
 const ENV_PATH = path.join(ROOT, '.env');
 const AUTH_COMMENT = '# Login del panel (generado por npm run set-password)';
+const DATA_COMMENT = '# Clave de cifrado de contraseñas VNC (no cambiar: el inventario quedaría ilegible)';
 
 function askHidden(prompt) {
   return new Promise((resolve, reject) => {
@@ -62,7 +64,18 @@ function askHidden(prompt) {
   });
 }
 
-function updateEnv(passwordHash, sessionSecret, envPath = ENV_PATH) {
+function readEnvValue(name, envPath = ENV_PATH) {
+  try {
+    const text = fs.readFileSync(envPath, 'utf8');
+    const m = new RegExp(`^\\s*${name}\\s*=\\s*(.*)$`, 'm').exec(text);
+    return m ? m[1].trim() : '';
+  } catch (e) {
+    if (e.code === 'ENOENT') return '';
+    throw e;
+  }
+}
+
+function updateEnv(passwordHash, sessionSecret, dataKey, envPath = ENV_PATH) {
   let text = '';
   try {
     text = fs.readFileSync(envPath, 'utf8');
@@ -73,7 +86,9 @@ function updateEnv(passwordHash, sessionSecret, envPath = ENV_PATH) {
   const lines = text.split(/\r?\n/).filter((line) =>
     !/^\s*AUTH_PASSWORD_HASH\s*=/.test(line)
     && !/^\s*SESSION_SECRET\s*=/.test(line)
-    && !line.startsWith(AUTH_COMMENT));
+    && !/^\s*DATA_ENCRYPTION_KEY\s*=/.test(line)
+    && !line.startsWith(AUTH_COMMENT)
+    && !line.startsWith(DATA_COMMENT));
   while (lines.length && lines[lines.length - 1] === '') lines.pop();
 
   const out = [
@@ -82,6 +97,9 @@ function updateEnv(passwordHash, sessionSecret, envPath = ENV_PATH) {
     AUTH_COMMENT,
     `AUTH_PASSWORD_HASH=${passwordHash}`,
     `SESSION_SECRET=${sessionSecret}`,
+    '',
+    DATA_COMMENT,
+    `DATA_ENCRYPTION_KEY=${dataKey}`,
     '',
   ].join(os.EOL);
 
@@ -98,8 +116,22 @@ async function main() {
   const repeat = await askHidden('Repite la contraseña: ');
   if (password !== repeat) throw new Error('Las contraseñas no coinciden.');
 
-  updateEnv(hashPassword(password), generateSessionSecret());
+  // La clave de cifrado del inventario no se rota al cambiar el login: si existía, se
+  // conserva (rotarla dejaría ilegibles las contraseñas VNC ya guardadas).
+  const existingKey = readEnvValue('DATA_ENCRYPTION_KEY');
+  if (existingKey && !isValidDataEncryptionKey(existingKey)) {
+    throw new Error(
+      'La DATA_ENCRYPTION_KEY actual en .env no es válida (deben ser 32 bytes en base64). '
+      + 'Corrígela a mano en lugar de regenerarla: si el inventario ya tiene contraseñas cifradas, se perderían.'
+    );
+  }
+  const dataKey = existingKey || generateDataEncryptionKey();
+
+  updateEnv(hashPassword(password), generateSessionSecret(), dataKey);
   console.log(`Listo. Guardado en ${ENV_PATH}. Reinicia el servidor para aplicar el cambio.`);
+  console.log(existingKey
+    ? 'Se conservó la DATA_ENCRYPTION_KEY existente.'
+    : 'Se generó una DATA_ENCRYPTION_KEY nueva para cifrar las contraseñas VNC.');
 }
 
 if (require.main === module) {

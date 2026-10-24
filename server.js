@@ -11,6 +11,7 @@ const { Store } = require('./lib/store');
 const { parseWorkbook, GROUPS } = require('./lib/excel');
 const { scanSubnet } = require('./lib/scan');
 const { createAuth } = require('./lib/auth');
+const { isValidDataEncryptionKey } = require('./lib/password-enc');
 
 const port = Number(process.env.PORT) || 8080;
 const cfg = {
@@ -61,7 +62,21 @@ try {
 }
 if (!cfg.vncPassword) console.warn('Aviso: VNC_PASSWORD vacío; solo funcionarán equipos con contraseña propia o sin contraseña.');
 
-const store = new Store(cfg.inventory);
+// Las contraseñas VNC por equipo se guardan cifradas en el inventario. Sin esta clave el
+// servidor no puede leerlas ni volver a guardarlas, así que se exige al arrancar.
+if (!isValidDataEncryptionKey(process.env.DATA_ENCRYPTION_KEY)) {
+  console.error('Falta DATA_ENCRYPTION_KEY o no es válida (32 bytes en base64/base64url).');
+  console.error('Genera una con: npm run set-password');
+  process.exit(1);
+}
+
+let store;
+try {
+  store = new Store(cfg.inventory);
+} catch (e) {
+  console.error(`No se pudo cargar el inventario (${cfg.inventory}): ${e.message}`);
+  process.exit(1);
+}
 if (!store.devices.length) console.warn(`Inventario vacío (${cfg.inventory}). Usa "Importar Excel" o "Agregar equipo" en el tablero.`);
 
 // Monitor y tienda comparten el mismo arreglo: lo que se agrega/borra entra en la siguiente ronda

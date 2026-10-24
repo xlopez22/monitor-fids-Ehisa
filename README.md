@@ -62,7 +62,7 @@ docker compose up -d --build
 Abre http://127.0.0.1:8080 e introduce la contraseña del panel.
 
 - El contenedor se reinicia solo con Docker (`restart: unless-stopped`).
-- El inventario vive en el volumen de Docker `fids-data` (montado en `/app/data`). La primera vez se llena con `data/inventory.json` de esta carpeta; después guarda lo que agregues, edites o importes. Sobrevive a `docker compose down` y a reconstruir la imagen. Solo se borra con `docker compose down -v`.
+- El inventario vive en el volumen de Docker `fids-data` (montado en `/app/data`). El volumen nace vacío: importa tu Excel o agrega los equipos desde el tablero. Sobrevive a `docker compose down` y a reconstruir la imagen. Solo se borra con `docker compose down -v`. La imagen no incluye `data/`, así que un `inventory.json` real nunca queda empaquetado.
 - Ver registros: `docker compose logs -f`
 - Detener: `docker compose down`
 - Copia de seguridad del inventario: `docker cp fids-monitor:/app/data/inventory.json respaldo.json`
@@ -79,7 +79,7 @@ npm run set-password
 npm start
 ```
 
-`set-password` pide la contraseña dos veces y guarda solo su hash scrypt y un `SESSION_SECRET` en `.env`. Si la olvidas, vuelve a ejecutarlo; las sesiones abiertas se invalidan. Para importar el Excel por línea de comandos: `npm run import -- "C:\ruta\inventario.xlsx"`.
+`set-password` pide la contraseña dos veces y guarda solo su hash scrypt, un `SESSION_SECRET` y una `DATA_ENCRYPTION_KEY` en `.env`. La clave de cifrado se conserva si ya existía: cambiar la contraseña del panel no deja ilegibles las contraseñas VNC guardadas. Si la olvidas, vuelve a ejecutarlo; las sesiones abiertas se invalidan. Para importar el Excel por línea de comandos: `npm run import -- "C:\ruta\inventario.xlsx"`.
 
 ## Cómo funciona
 
@@ -94,6 +94,7 @@ npm start
 |---|---|---|
 | `AUTH_PASSWORD_HASH` | — | Hash scrypt de la contraseña del panel; lo genera `npm run set-password` |
 | `SESSION_SECRET` | — | Secreto para firmar la cookie de sesión; lo genera `npm run set-password` |
+| `DATA_ENCRYPTION_KEY` | — | Clave AES-256-GCM (32 bytes base64) para cifrar las contraseñas VNC del inventario; no rotarla sin volver a cargarlas |
 | `APP_HOSTS` | `127.0.0.1:PORT,localhost:PORT` | Hosts permitidos en la cabecera `Host` (separados por coma) |
 | `APP_ORIGINS` | `http://127.0.0.1:PORT,http://localhost:PORT` | Orígenes permitidos para peticiones y WebSocket (separados por coma) |
 | `COOKIE_SECURE` | `false` | `true` si el panel va detrás de HTTPS |
@@ -111,11 +112,11 @@ npm start
 
 ## Notas
 
-- El panel usa una sola contraseña por instalación, sin usuarios ni roles. La cookie de sesión es `HttpOnly` y `SameSite=Strict`, y las peticiones/WebSocket se validan contra `Host` y `Origin`. El servidor no arranca hasta que exista `AUTH_PASSWORD_HASH` y `SESSION_SECRET`.
+- El panel usa una sola contraseña por instalación, sin usuarios ni roles. La cookie de sesión es `HttpOnly` y `SameSite=Strict`, y las peticiones/WebSocket se validan contra `Host` y `Origin`. El servidor no arranca hasta que existan `AUTH_PASSWORD_HASH`, `SESSION_SECRET` y `DATA_ENCRYPTION_KEY`.
 - Usa siempre el mismo nombre para abrir el panel (`localhost` o `127.0.0.1`): la cookie de sesión no se comparte entre ambos.
 - La autenticación VNC usa DES, que Node 17+ ya no trae activo: por eso se arranca con `--openssl-legacy-provider`.
 - VNC clásico no cifra la imagen. Va dentro de la VLAN y el panel solo es accesible desde esta PC.
-- Las contraseñas propias de cada equipo se guardan en texto plano en `inventory.json` (dentro del volumen).
+- Las contraseñas propias de cada equipo se guardan cifradas con AES-256-GCM (`enc:v1:...`) en `inventory.json`; la clave vive solo en `.env` (`DATA_ENCRYPTION_KEY`). Los inventarios viejos en texto plano se cifran solos en la primera carga.
 - Los video walls (Optiplex) a veces tardan más de 20 s en entregar el cuadro y fallan una ronda; se recuperan en la siguiente.
 
 ## Pruebas sin la VLAN

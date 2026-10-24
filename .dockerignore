@@ -1,5 +1,11 @@
-node_modules
+# Nunca empaquetar secretos ni el inventario real
 .env
-test
-*.md
-data/*.tmp
+.env.*
+data/
+scripts/*.tmp.js
+
+# Ruido de desarrollo
+node_modules/
+*.log
+.DS_Store
+test/
