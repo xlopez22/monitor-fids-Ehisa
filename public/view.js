@@ -1,0 +1,464 @@
+import RFB from '/novnc/core/rfb.js';
+
+const $ = (s) => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+const ip = params.get('ip');
+const force = params.get('force') === '1';
+
+// Texto del inventario antes de insertarlo como HTML (nombres pueden venir de un Excel)
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+let rfb;
+let device = null;
+let remoteClipboardSeen = false; // ¿UltraVNC ya mandó algo de su portapapeles en esta sesión?
+let connId = '';                 // id de esta conexión de visor, para pedir el control
+let controlling = false;
+let switchingControl = false;
+let controlOp = 0;               // invalida respuestas viejas si la conexión cambia
+
+function newConnId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+function cookie(name) {
+  const part = document.cookie.split('; ').find((c) => c.startsWith(`${name}=`));
+  return part ? decodeURIComponent(part.slice(name.length + 1)) : '';
+}
+async function postJson(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': cookie('fids.csrf') },
+    body: JSON.stringify(body || {}),
+  });
+  let data = {};
+  try { data = await res.json(); } catch { /* respuesta sin JSON */ }
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+}
+
+const ago = (ts) => {
+  const s = Math.round((Date.now() - ts) / 1000);
+  return s < 60 ? `hace ${s}s` : s < 3600 ? `hace ${Math.round(s / 60)} min` : `hace ${Math.round(s / 3600)} h`;
+};
+
+// Equipo caído: no se conecta, salvo que el usuario pida intentarlo igual
+function showDown(d) {
+  setStatus('Caído', 'bad');
+  const seen = d.status.lastSeen ? `Visto por última vez ${ago(d.status.lastSeen)}.` : 'No se ha visto en línea desde que arrancó el panel.';
+  $('#screen').innerHTML = `<div class="down"><div class="box">
+    <h2>${esc(d.name)} no responde en el puerto VNC</h2>
+    <div>${seen} Puede estar apagado, sin red o con UltraVNC detenido.</div>
+    <div class="row"><button id="tryAnyway">Intentar de todos modos</button><button id="downBack">← Tablero</button></div>
+  </div></div>`;
+  $('#tryAnyway').addEventListener('click', () => connect());
+  $('#downBack').addEventListener('click', goBack);
+}
+
+async function init() {
+  if (!ip) return setStatus('Falta ?ip= en la dirección', 'bad');
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return setStatus('IP no válida en la dirección', 'bad');
+  try {
+    const { devices } = await fetch('/api/devices').then((r) => r.json());
+    device = devices.find((x) => x.ip === ip) || null;
+  } catch { /* sin datos: se intenta conectar igual */ }
+  $('#title').textContent = device ? `${device.name} — ${device.description}` : ip;
+  document.title = device ? device.name : ip;
+  if (device?.status && device.status.online === false && !force) return showDown(device);
+  connect();
+}
+
+function setStatus(text, cls = '') {
+  $('#status').textContent = text;
+  $('#status').className = `status ${cls}`;
+}
+
+async function connect() {
+  if (rfb) rfb.disconnect();
+  $('#screen').innerHTML = '';
+  setStatus('Conectando…');
+  // Cada conexión tiene su propio id: el servidor la registra en solo lectura.
+  connId = newConnId();
+  controlOp++;
+  switchingControl = false;
+  controlling = false;
+  setFast(false);
+  const controlBtn = $('#control');
+  controlBtn.classList.remove('active');
+  controlBtn.textContent = 'Tomar control';
+  controlBtn.disabled = false;
+  // Pedir token de un solo uso para WebSocket
+  let wsToken = '';
+  try {
+    const r = await fetch('/api/ws-token', { credentials: 'same-origin' });
+    if (r.ok) {
+      const data = await r.json();
+      wsToken = data.token || '';
+    }
+  } catch { /* sin token: el servidor rechazará la conexión */ }
+  const qs = new URLSearchParams({ conn: connId });
+  if (wsToken) qs.set('t', wsToken);
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const thisRfb = new RFB($('#screen'), `${proto}://${location.host}/ws/${ip}?${qs}`, { wsProtocols: ['binary'] });
+  rfb = thisRfb;
+  thisRfb.scaleViewport = true;
+  thisRfb.resizeSession = false;
+  // Los reproductores FIDS suelen ocultar el cursor: noVNC muestra un punto en su lugar
+  thisRfb.showDotCursor = true;
+  // El servidor arranca siempre en solo lectura; el control se pide aparte.
+  thisRfb.viewOnly = true;
+  thisRfb.qualityLevel = Number($('#quality').value);
+  thisRfb.compressionLevel = Number($('#compression').value);
+  thisRfb.addEventListener('connect', () => { if (rfb === thisRfb) setStatus('Conectado', 'ok'); });
+  // Texto copiado en el equipo remoto -> portapapeles de esta PC
+  thisRfb.addEventListener('clipboard', async (e) => {
+    if (rfb !== thisRfb) return;
+    const text = e.detail.text;
+    remoteClipboardSeen = true;
+    try {
+      await navigator.clipboard.writeText(text);
+      hint(`Copiado del equipo a tu PC (${text.length} caracteres).`);
+    } catch {
+      hint('El equipo copió texto, pero el navegador no dejó pasarlo a tu PC: haz clic en esta ventana y vuelve a copiar.', true);
+    }
+  });
+  thisRfb.addEventListener('disconnect', async (e) => {
+    if (rfb !== thisRfb) return;
+    controlOp++;
+    switchingControl = false;
+    releaseAll();
+    controlling = false;
+    if (navigator.keyboard?.unlock) navigator.keyboard.unlock();
+    setFast(false);
+    controlBtn.classList.remove('active');
+    controlBtn.textContent = 'Tomar control';
+    controlBtn.disabled = false;
+    if (leaving) return;
+    if (e.detail.clean) return setStatus('Desconectado', 'bad');
+    // El servidor guarda el motivo (contraseña, bloqueo, equipo apagado…)
+    const r = await fetch(`/api/devices/${ip}/proxy-error`).then((x) => x.json()).catch(() => ({}));
+    setStatus(r.error ? `No conectó: ${r.error}` : 'Conexión perdida o rechazada', 'bad');
+  });
+}
+
+let leaving = false;
+function goBack() {
+  leaving = true;
+  releaseAll();
+  if (rfb) rfb.disconnect();
+  location.href = '/';
+}
+$('#back').addEventListener('click', goBack);
+// Alt+← vuelve al tablero solo cuando NO se controla: controlando, esa tecla es del equipo remoto
+window.addEventListener('keydown', (e) => {
+  if (!controlling && e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); goBack(); }
+}, true);
+
+function hint(text, warn = false) {
+  $('#hint').textContent = text;
+  $('#hint').className = `hint${warn ? ' warn' : ''}`;
+  $('#hint').hidden = !text;
+}
+
+// Tomar control = permiso del servidor + pantalla completa + bloqueo de teclado.
+// El servidor arranca en solo lectura y solo habilita teclado/ratón/pegado tras el POST.
+async function setControl(on) {
+  if (switchingControl || !rfb || on === controlling) return;
+  const op = ++controlOp;
+  switchingControl = true;
+  const targetRfb = rfb;
+  const targetConn = connId;
+  const btn = $('#control');
+  btn.disabled = true;
+  // Si la conexión o el intento cambiaron mientras esperábamos, no tocar el estado nuevo.
+  const current = () => op === controlOp && rfb === targetRfb && connId === targetConn;
+
+  if (on) {
+    // Pantalla completa y bloqueo de teclado en el mismo gesto del click, antes de
+    // esperar la respuesta del servidor.
+    let locked = false;
+    try {
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+    } catch { /* sin pantalla completa */ }
+    try {
+      if (navigator.keyboard?.lock) { await navigator.keyboard.lock(); locked = true; }
+    } catch { /* sin bloqueo de teclado */ }
+    if (!current()) return;
+
+    btn.textContent = 'Conectando control…';
+    try {
+      await postJson(`/api/devices/${ip}/control`, { conn: targetConn });
+      if (!current()) {
+        // El permiso se concedió a una conexión que ya no es la actual: revocarlo.
+        postJson(`/api/devices/${ip}/release`, { conn: targetConn }).catch(() => {});
+        return;
+      }
+      controlling = true;
+      rfb.viewOnly = false;
+      btn.classList.add('active');
+      btn.textContent = 'Controlando (soltar)';
+      setFast(true);
+      rfb.focus();
+      hint(locked
+        ? 'Controlando: todas las teclas (Windows, Alt+Tab, Esc…) van al equipo remoto. Para salir del control mantén presionada Esc o pulsa "Controlando (soltar)".'
+        : 'Controlando. Este navegador no permite capturar la tecla Windows ni Alt+Tab: usa los botones ⊞ Win, Alt+Tab, Esc de la barra.', !locked);
+    } catch (e) {
+      if (!current()) return;
+      controlling = false;
+      rfb.viewOnly = true;
+      btn.classList.remove('active');
+      btn.textContent = 'Tomar control';
+      if (navigator.keyboard?.unlock) navigator.keyboard.unlock();
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      setFast(false);
+      hint(`No se pudo tomar control: ${e.message}`, true);
+    }
+  } else {
+    // Primero los key-up, mientras el servidor todavía acepta entrada.
+    releaseAll();
+    controlling = false;
+    rfb.viewOnly = true;
+    btn.classList.remove('active');
+    btn.textContent = 'Tomar control';
+    let failed = false;
+    try {
+      await postJson(`/api/devices/${ip}/release`, { conn: targetConn });
+    } catch {
+      failed = true;
+    }
+    if (!current()) return;
+    if (failed) {
+      // Si no se pudo confirmar, cerrar la conexión revoca el control igual.
+      try { rfb.disconnect(); } catch { /* ya cerrado */ }
+      hint('No se pudo confirmar la liberación; se cerró el visor para revocar el control.', true);
+    }
+    if (navigator.keyboard?.unlock) navigator.keyboard.unlock();
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    setFast(false);
+    if (!failed) hint('');
+  }
+
+  if (!current()) return;
+  switchingControl = false;
+  btn.disabled = false;
+}
+// Puntero grande: noVNC pone el cursor remoto como estilo en línea del canvas (o un punto de 3 px
+// si el reproductor lo oculta). Una regla CSS con !important lo reemplaza por una flecha visible.
+// Flecha ≈ el puntero normal de Windows; Grande/Muy grande para verlo de lejos
+const POINTER_SIZES = { arrow: 22, big: 30, huge: 40 };
+// La CSP no permite crear <style>: los tres punteros son clases estáticas de view.css.
+function setPointer(size) {
+  const px = POINTER_SIZES[size];
+  document.documentElement.classList.remove('pointer-arrow', 'pointer-big', 'pointer-huge');
+  if (px) document.documentElement.classList.add(`pointer-${size}`);
+  try { localStorage.setItem('fids-pointer', size); } catch { /* sin almacenamiento */ }
+}
+let savedPointer = 'arrow';
+try {
+  savedPointer = localStorage.getItem('fids-pointer') || 'arrow';
+  // Una sola vez: los tamaños anteriores (48/72 px) eran desproporcionados
+  if (!localStorage.getItem('fids-pointer-v2')) {
+    savedPointer = 'arrow';
+    localStorage.setItem('fids-pointer-v2', '1');
+  }
+} catch { /* sin almacenamiento */ }
+if (!(savedPointer in POINTER_SIZES) && savedPointer !== 'normal') savedPointer = 'arrow';
+$('#pointer').value = savedPointer;
+setPointer(savedPointer);
+$('#pointer').addEventListener('change', (e) => setPointer(e.target.value));
+
+// Modo Rápido: JPEG de baja calidad y compresión alta (menos datos por cuadro 4K).
+// Se activa al tomar control y se apaga al soltarlo, volviendo a lo que tenían los controles.
+const FAST = { quality: 1, compression: 9 };
+let normal = null; // valores de los controles antes de entrar en modo Rápido
+function applyQuality() {
+  if (!rfb) return;
+  rfb.qualityLevel = Number($('#quality').value);
+  rfb.compressionLevel = Number($('#compression').value);
+}
+function setFast(on) {
+  const active = normal !== null;
+  if (on === active) return;
+  if (on) {
+    normal = { quality: $('#quality').value, compression: $('#compression').value };
+    $('#quality').value = FAST.quality;
+    $('#compression').value = FAST.compression;
+  } else {
+    $('#quality').value = normal.quality;
+    $('#compression').value = normal.compression;
+    normal = null;
+  }
+  $('#fast').classList.toggle('active', on);
+  $('#fast').textContent = on ? '⚡ Rápido (volver a normal)' : '⚡ Rápido';
+  applyQuality();
+}
+$('#fast').addEventListener('click', () => setFast(normal === null));
+
+$('#control').addEventListener('click', () => {
+  setControl(!controlling);
+});
+// Al salir de pantalla completa (Esc sostenido) se suelta el control
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && controlling) { setFast(false); setControl(false); }
+});
+
+// Teclas (keysyms X11)
+const K = {
+  ctrl: [0xffe3, 'ControlLeft'], alt: [0xffe9, 'AltLeft'], shift: [0xffe1, 'ShiftLeft'], win: [0xffeb, 'MetaLeft'],
+  tab: [0xff09, 'Tab'], esc: [0xff1b, 'Escape'], enter: [0xff0d, 'Enter'],
+  del: [0xffff, 'Delete'], home: [0xff50, 'Home'], end: [0xff57, 'End'],
+  c: [0x63, 'KeyC'], v: [0x76, 'KeyV'], r: [0x72, 'KeyR'],
+};
+const COMBOS = { win: ['win'], alttab: ['alt', 'tab'], esc: ['esc'], ctrlesc: ['ctrl', 'esc'], ctrlc: ['ctrl', 'c'] };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function needControl() {
+  if (rfb && controlling) return true;
+  hint('Estás en modo solo observar: pulsa "Tomar control" para enviar teclas.', true);
+  return false;
+}
+function sendCombo(names) {
+  const keys = names.map((k) => K[k]);
+  for (const [sym, code] of keys) rfb.sendKey(sym, code, true);
+  for (const [sym, code] of [...keys].reverse()) rfb.sendKey(sym, code, false);
+}
+for (const b of document.querySelectorAll('[data-keys]')) {
+  b.addEventListener('click', () => {
+    if (!needControl()) return;
+    sendCombo(COMBOS[b.dataset.keys]);
+    rfb.focus();
+  });
+}
+
+// Modificadores que se mantienen: clic = presionar, otro clic = soltar.
+// Mientras está presionado, los clics y teclas que hagas van combinados (Ctrl+clic, Ctrl+Shift+Esc…)
+const held = new Set();
+function releaseAll() {
+  for (const k of held) {
+    if (rfb && !rfb.viewOnly) rfb.sendKey(K[k][0], K[k][1], false);
+  }
+  held.clear();
+  document.querySelectorAll('[data-hold]').forEach((b) => b.classList.remove('held'));
+}
+for (const b of document.querySelectorAll('[data-hold]')) {
+  b.addEventListener('click', () => {
+    if (!needControl()) return;
+    const k = b.dataset.hold;
+    const down = !held.has(k);
+    rfb.sendKey(K[k][0], K[k][1], down);
+    if (down) held.add(k); else held.delete(k);
+    b.classList.toggle('held', down);
+    rfb.focus();
+  });
+}
+
+// ---------- Portapapeles ----------
+// Pone texto en el portapapeles del equipo y, si se pide, lo pega con Ctrl+V
+async function sendClipboard(text, paste, ctrlAlreadyDown = false) {
+  rfb.clipboardPasteFrom(text);
+  if (!paste) return;
+  await sleep(150); // que el texto llegue al equipo antes que el Ctrl+V
+  if (ctrlAlreadyDown) rfb.sendKey(K.v[0], K.v[1]);
+  else sendCombo(['ctrl', 'v']);
+}
+async function pasteFromLocal(ctrlAlreadyDown) {
+  let text;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    return hint('El navegador no dejó leer tu portapapeles: acepta el permiso de portapapeles para 127.0.0.1 (ícono a la izquierda de la dirección) y vuelve a intentar.', true);
+  }
+  if (!text) return hint('Tu portapapeles está vacío (solo se puede pasar texto).', true);
+  await sendClipboard(text, true, ctrlAlreadyDown);
+  hint(`Enviado al equipo y pegado (${text.length} caracteres).${remoteClipboardSeen ? ''
+    : ' Si no aparece, UltraVNC puede tener desactivada la transferencia de portapapeles en ese equipo.'}`);
+  rfb.focus();
+}
+// Ctrl+V físico en modo control: primero se envía el texto de esta PC, después la tecla
+window.addEventListener('keydown', (e) => {
+  if (!controlling || !rfb) return;
+  if (e.target.closest?.('textarea, input')) return;
+  if (e.ctrlKey && !e.altKey && e.code === 'KeyV') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (!e.repeat) pasteFromLocal(true);
+  }
+}, true);
+$('#ctrlv').addEventListener('click', () => { if (needControl()) pasteFromLocal(false); });
+
+// ---------- Reiniciar NG-Client (como el acceso directo START DDS CLIENT) ----------
+// Se TECLEA la orden en Ejecutar (Win+R): el portapapeles de UltraVNC no siempre pasa,
+// y un Enter sobre un texto viejo ejecutaría otra cosa. UltraVNC traduce cada keysym
+// a la distribución de teclado del equipo (incluido Shift para ':' o '\').
+async function typeText(text) {
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    if (code < 0x20 || code > 0x7e) throw new Error(`Carácter no soportado: ${ch}`);
+    rfb.sendKey(code, '');
+    await sleep(15);
+  }
+}
+// Abre Ejecutar, lo deja vacío, escribe la orden y la lanza
+async function runInRunBox(cmd) {
+  sendCombo(['win', 'r']);
+  await sleep(1000);
+  // Ejecutar trae la orden anterior: Fin, Shift+Inicio (seleccionar todo) y Supr la borran
+  sendCombo(['end']);
+  sendCombo(['shift', 'home']);
+  sendCombo(['del']);
+  await sleep(100);
+  await typeText(cmd);
+  await sleep(200);
+  sendCombo(['enter']);
+}
+let ngCfg = null;
+fetch('/api/config').then((r) => r.json()).then((c) => { ngCfg = c; }).catch(() => {});
+let restarting = false;
+$('#restartNg').addEventListener('click', async () => {
+  if (!needControl() || !ngCfg || restarting) return;
+  const name = device?.name || ip;
+  if (!confirm(`¿Reiniciar NG-Client en ${name}?\n\nSe usará Ejecutar (Win+R) en el equipo dos veces:\n1. ${ngCfg.ngClientKill}\n2. ${ngCfg.ngClientStart}`)) return;
+  restarting = true;
+  $('#restartNg').disabled = true;
+  try {
+    releaseAll();
+    hint('Cerrando NG-Client…');
+    await runInRunBox(ngCfg.ngClientKill);
+    await sleep(2500);
+    hint('Abriendo NG-Client…');
+    await runInRunBox(ngCfg.ngClientStart);
+    hint('Listo. NG-Client debería quedar a pantalla completa en unos segundos; si no, revisa la pantalla.');
+  } catch (e) {
+    hint(`No se pudo completar: ${e.message}`, true);
+  } finally {
+    restarting = false;
+    $('#restartNg').disabled = false;
+    rfb.focus();
+  }
+});
+
+// Mover un control a mano sale del modo Rápido (sin pisar lo que se acaba de elegir)
+for (const id of ['#quality', '#compression']) {
+  $(id).addEventListener('change', () => {
+    if (normal !== null) {
+      normal = null;
+      $('#fast').classList.remove('active');
+      $('#fast').textContent = '⚡ Rápido';
+    }
+    applyQuality();
+  });
+}
+$('#cad').addEventListener('click', () => {
+  if (!controlling) return hint('Estás en modo solo observar: pulsa "Tomar control" para enviar teclas.', true);
+  if (rfb) rfb.sendCtrlAltDel();
+});
+$('#fullscreen').addEventListener('click', () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen();
+});
+$('#reconnect').addEventListener('click', () => connect());
+
+window.addEventListener('beforeunload', releaseAll);
+init();

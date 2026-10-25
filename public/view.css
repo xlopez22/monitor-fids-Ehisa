@@ -1,0 +1,30 @@
+:root { --bar: #181b21; --text: #e6e8eb; --muted: #9aa1ab; --border: #2a2f37; --ok: #16a34a; --bad: #dc2626; --accent: #2563eb; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #000; color: var(--text); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; }
+body { display: flex; flex-direction: column; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 6px 12px; background: var(--bar); border-bottom: 1px solid var(--border); }
+.bar b { font-size: 14px; }
+.status { color: var(--muted); }
+.status.ok { color: var(--ok); }
+.status.bad { color: var(--bad); }
+.spacer { flex: 1; }
+label { display: flex; align-items: center; gap: 4px; color: var(--muted); }
+button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 5px; background: #23272f; color: var(--text); font: inherit; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.back { font-weight: 600; }
+.keys { display: inline-flex; gap: 4px; }
+.hint { padding: 4px 12px; background: #1e3a8a; color: #dbeafe; font-size: 12px; }
+.hint.warn { background: #78350f; color: #fef3c7; }
+input[type=range] { width: 80px; }
+select { padding: 3px 6px; border: 1px solid var(--border); border-radius: 5px; background: #23272f; color: var(--text); font: inherit; }
+#screen { flex: 1; min-height: 0; position: relative; }
+button.held { background: #b45309; border-color: #b45309; color: #fff; }
+.muted { color: var(--muted); font-size: 12px; }
+.down { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.down .box { max-width: 460px; padding: 20px 24px; background: var(--bar); border: 1px solid var(--border); border-radius: 10px; text-align: center; display: grid; gap: 12px; }
+.down h2 { margin: 0; font-size: 17px; color: #fca5a5; }
+.down .row { display: flex; gap: 8px; justify-content: center; }
+html.pointer-arrow #screen canvas { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2222%22%20height%3D%2222%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M2%202%20L2%2020%20L7%2015.5%20L10.5%2022.5%20L13.8%2021%20L10.3%2014.2%20L17%2014.2%20Z%22%20fill%3D%22%23fff%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.4%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E") 2 2, default !important; }
+html.pointer-big #screen canvas { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2230%22%20height%3D%2230%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M2%202%20L2%2020%20L7%2015.5%20L10.5%2022.5%20L13.8%2021%20L10.3%2014.2%20L17%2014.2%20Z%22%20fill%3D%22%23fff%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.4%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E") 3 3, default !important; }
+html.pointer-huge #screen canvas { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M2%202%20L2%2020%20L7%2015.5%20L10.5%2022.5%20L13.8%2021%20L10.3%2014.2%20L17%2014.2%20Z%22%20fill%3D%22%23fff%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.4%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E") 3 3, default !important; }

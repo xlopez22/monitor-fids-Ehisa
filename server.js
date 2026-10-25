@@ -15,6 +15,7 @@ const { isValidDataEncryptionKey } = require('./lib/password-enc');
 const { loadCa } = require('./lib/vnc-connect');
 const { ViewerControl } = require('./lib/viewer-control');
 const { createLimiters } = require('./lib/rate-limit');
+const { securityHeaders } = require('./lib/security-headers');
 
 const port = Number(process.env.PORT) || 8080;
 const cfg = {
@@ -127,6 +128,7 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', cfg.trustProxy ? 1 : false);
 const limiters = createLimiters();
+app.use(securityHeaders({ origins: cfg.appOrigins }));
 app.use(express.json({ limit: '64kb' }));
 app.use(auth.sessionParser);
 app.use(auth.originGuard);

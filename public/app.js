@@ -30,7 +30,11 @@ function updateAges() {
   for (const el of $$('[data-ts]')) el.textContent = ago(Number(el.dataset.ts));
 }
 function esc(s) {
-  return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+// Selector seguro para atributos data-* (IP y grupo vienen del inventario)
+function cssEsc(s) {
+  return window.CSS?.escape ? CSS.escape(String(s)) : String(s).replace(/["\\]/g, '\\$&');
 }
 let toastTimer;
 function toast(msg, isError = false) {
@@ -119,16 +123,16 @@ function thumbHtml(d) {
   const st = d.status;
   if (st && !st.online) {
     // Caído: no se abre el visor. Si hay una captura vieja se muestra apagada, con el aviso encima
-    return `${d.thumbAt ? `<img class="stale" src="/thumb/${d.ip}?t=${d.thumbAt}" alt="">` : ''}
+    return `${d.thumbAt ? `<img class="stale" src="/thumb/${encodeURIComponent(d.ip)}?t=${d.thumbAt}" alt="">` : ''}
       <span class="downMsg">Caído · sin respuesta en puerto VNC${st.lastSeen ? `<br>visto <span data-ts="${st.lastSeen}"></span>` : ''}</span>`;
   }
   if (d.thumbAt) {
     // El texto "hace X" lo llena updateAges(): así el HTML no cambia en cada refresco
-    return `<img src="/thumb/${d.ip}?t=${d.thumbAt}" alt=""><span class="age" data-ts="${d.thumbAt}"></span>`;
+    return `<img src="/thumb/${encodeURIComponent(d.ip)}?t=${d.thumbAt}" alt=""><span class="age" data-ts="${d.thumbAt}"></span>`;
   }
   return `<span>${!st ? 'Revisando…' : d.thumbError ? 'Sin miniatura' : 'Capturando…'}</span>`;
 }
-const viewUrl = (d, force) => `/view.html?ip=${d.ip}${force ? '&force=1' : ''}`;
+const viewUrl = (d, force) => `/view.html?ip=${encodeURIComponent(d.ip)}${force ? '&force=1' : ''}`;
 function badges(d) {
   return `${d.hasPassword ? '<span class="badge" title="Usa contraseña propia">🔑</span>' : ''}${d.manual ? '<span class="badge" title="Agregado a mano">manual</span>' : ''}`;
 }
@@ -137,8 +141,8 @@ function actionBtns(d) {
   const retry = d.status && !d.status.online
     ? `<a class="btnLink small" href="${viewUrl(d, true)}" title="Abrir el visor aunque el equipo aparezca caído (por si acaba de encender)">Intentar de todos modos</a>`
     : '';
-  return `${retry}<button class="icon" data-act="refresh" data-ip="${d.ip}" title="Volver a sacar la miniatura" ${busy ? 'disabled' : ''}>${busy ? '…' : '↻'}</button>
-    <button class="icon" data-act="edit" data-ip="${d.ip}" title="Editar equipo">✎</button>`;
+  return `${retry}<button class="icon" data-act="refresh" data-ip="${esc(d.ip)}" title="Volver a sacar la miniatura" ${busy ? 'disabled' : ''}>${busy ? '…' : '↻'}</button>
+    <button class="icon" data-act="edit" data-ip="${esc(d.ip)}" title="Editar equipo">✎</button>`;
 }
 function card(d) {
   const st = statusOf(d);
@@ -146,13 +150,13 @@ function card(d) {
   // Los caídos no son enlace: el visor solo se abre con "Intentar de todos modos"
   const thumb = off
     ? `<div class="thumb">${thumbHtml(d)}</div>`
-    : `<a class="thumb" href="${viewUrl(d)}" title="Abrir ${esc(d.name)} en vivo${d.resolution ? ' — ' + d.resolution : ''}">${thumbHtml(d)}</a>`;
+    : `<a class="thumb" href="${viewUrl(d)}" title="Abrir ${esc(d.name)} en vivo${d.resolution ? ' — ' + esc(d.resolution) : ''}">${thumbHtml(d)}</a>`;
   const name = off ? `<span class="name">${esc(d.name)}</span>` : `<a class="name" href="${viewUrl(d)}">${esc(d.name)}</a>`;
   return `
-    <div class="card ${st} ${d.health?.level === 'warn' ? 'warnScreen' : ''}" data-ip="${d.ip}">
+    <div class="card ${st} ${d.health?.level === 'warn' ? 'warnScreen' : ''}" data-ip="${esc(d.ip)}">
       ${thumb}
       <div class="info">
-        <div class="row"><span class="dot ${st}"></span>${name}${badges(d)}<span class="ip">${d.ip}</span></div>
+        <div class="row"><span class="dot ${st}"></span>${name}${badges(d)}<span class="ip">${esc(d.ip)}</span></div>
         <div class="row"><span class="desc">${esc(d.description || d.model || '')}</span><span class="btns">${actionBtns(d)}</span></div>
         ${healthHtml(d)}
         ${d.thumbError && d.status?.online ? `<div class="err">${esc(d.thumbError)}</div>` : ''}
@@ -163,15 +167,15 @@ function rowHtml(d) {
   const st = statusOf(d);
   const off = st === 'offline';
   const label = { online: 'En línea', error: 'Con error', offline: 'Caído', pending: 'Revisando' }[st];
-  const img = d.thumbAt ? `<img ${off ? 'class="stale"' : ''} src="/thumb/${d.ip}?t=${d.thumbAt}" alt="">` : '';
+  const img = d.thumbAt ? `<img ${off ? 'class="stale"' : ''} src="/thumb/${encodeURIComponent(d.ip)}?t=${d.thumbAt}" alt="">` : '';
   return `
-    <tr class="${st}" data-ip="${d.ip}">
+    <tr class="${st}" data-ip="${esc(d.ip)}">
       <td class="mini">${off ? `<span class="miniBox">${img}</span>` : `<a href="${viewUrl(d)}">${img}</a>`}</td>
       <td class="st"><span class="dot ${st}"></span> ${label}</td>
       <td>${off ? `<span class="name">${esc(d.name)}</span>` : `<a class="name" href="${viewUrl(d)}">${esc(d.name)}</a>`} ${badges(d)}</td>
       <td class="desc">${esc(d.description || '')}</td>
-      <td class="ip">${d.ip}</td>
-      <td>${d.resolution || ''}</td>
+      <td class="ip">${esc(d.ip)}</td>
+      <td>${esc(d.resolution || '')}</td>
       <td>${d.thumbAt ? `<span data-ts="${d.thumbAt}"></span>` : ''}</td>
       <td>${healthHtml(d)}</td>
       <td class="err">${d.status?.online && d.thumbError ? esc(d.thumbError) : ''}</td>
@@ -209,17 +213,18 @@ function render() {
         : `<div class="tableWrap"><table class="list"><thead><tr><th></th><th>Estado</th><th>Nombre</th><th>Ubicación</th><th>IP</th><th>Resolución</th><th>Captura</th><th>Pantalla</th><th>Error</th><th></th></tr></thead><tbody>${items}</tbody></table></div>`;
     };
     $('#groups').innerHTML = list.length
-      ? [...groups.values()].map((g) => `<section><h2 data-group="${g.key}">${groupHeader(g)}</h2>${body(g)}</section>`).join('')
+      ? [...groups.values()].map((g) => `<section><h2 data-group="${esc(g.key)}">${groupHeader(g)}</h2>${body(g)}</section>`).join('')
       : '<div class="empty">Ningún equipo coincide con el filtro.</div>';
   } else {
     for (const g of groups.values()) {
-      const h2 = $(`h2[data-group="${g.key}"]`);
+      // Buscar por dataset evita romper el selector si la zona trae comillas
+      const h2 = $$('#groups h2[data-group]').find((el) => el.dataset.group === g.key);
       if (h2) h2.innerHTML = groupHeader(g);
     }
     for (const d of list) {
       const h = item(d);
       if (lastHtml.get(d.ip) === h) continue;
-      const el = $(`[data-ip="${d.ip}"].card, tr[data-ip="${d.ip}"]`);
+      const el = $(`[data-ip="${cssEsc(d.ip)}"].card, tr[data-ip="${cssEsc(d.ip)}"]`);
       if (el) el.outerHTML = h;
       lastHtml.set(d.ip, h);
     }
@@ -241,11 +246,11 @@ function fillGroupSelects() {
   const sel = $('#group');
   const cur = state.filter.group;
   sel.innerHTML = '<option value="">Todas las zonas</option>' +
-    [...used].map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+    [...used].map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
   sel.value = used.has(cur) ? cur : '';
   state.filter.group = sel.value;
   $('#devForm [name=group]').innerHTML = Object.entries(state.groups)
-    .map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+    .map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
 }
 
 async function load() {
@@ -268,7 +273,7 @@ async function refreshOne(ip) {
   state.refreshing.add(ip);
   render();
   try {
-    const d = await api('POST', `/api/devices/${ip}/refresh`);
+    const d = await api('POST', `/api/devices/${encodeURIComponent(ip)}/refresh`);
     const i = state.devices.findIndex((x) => x.ip === ip);
     if (i >= 0) state.devices[i] = d;
     if (d.thumbError) toast(`${d.name}: ${d.thumbError}`, true);
@@ -400,17 +405,17 @@ $('#scanForm').addEventListener('submit', async (e) => {
   try {
     const r = await api('POST', '/api/scan', { prefix: e.target.elements.prefix.value || undefined });
     $('#scanResults').innerHTML = r.results.length
-      ? `<p class="muted">Red revisada: ${r.prefixes.join(', ')}. ${r.results.length} equipo(s) con VNC que no están en la lista:</p>
+      ? `<p class="muted">Red revisada: ${esc(r.prefixes.join(', '))}. ${r.results.length} equipo(s) con VNC que no están en la lista:</p>
          <div class="scanGrid">${r.results.map((x) => `
            <div class="scanItem">
-             <div class="thumb">${x.thumb ? `<img src="${x.thumb}" alt="">` : '<span>Sin imagen</span>'}</div>
+             <div class="thumb">${x.thumb ? `<img src="${esc(x.thumb)}" alt="">` : '<span>Sin imagen</span>'}</div>
              <div class="info">
-               <b>${x.ip}</b> ${x.resolution ? `<span class="muted">${x.resolution}</span>` : ''}
+               <b>${esc(x.ip)}</b> ${x.resolution ? `<span class="muted">${esc(x.resolution)}</span>` : ''}
                <div class="${x.ok ? 'okTxt' : 'err'}">${x.ok ? 'Entra con la contraseña general' : esc(x.error)}</div>
-               <button data-add="${x.ip}" class="primary small">＋ Agregar</button>
+               <button data-add="${esc(x.ip)}" class="primary small">＋ Agregar</button>
              </div>
            </div>`).join('')}</div>`
-      : `<p class="muted">Red revisada: ${r.prefixes.join(', ')}. No hay equipos nuevos con VNC abierto.</p>`;
+      : `<p class="muted">Red revisada: ${esc(r.prefixes.join(', '))}. No hay equipos nuevos con VNC abierto.</p>`;
   } catch (err) {
     $('#scanResults').innerHTML = `<p class="err">${esc(err.message)}</p>`;
   } finally {
