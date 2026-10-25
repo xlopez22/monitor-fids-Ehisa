@@ -102,6 +102,65 @@ async function api(method, url, body, raw = false) {
   return data;
 }
 
+// ---------- panel lateral ----------
+const shell = $('#appShell');
+const sidebarToggle = $('#sidebarToggle');
+const sidebarClose = $('#sidebarClose');
+const sidebarOverlay = $('#sidebarOverlay');
+const mobileNav = window.matchMedia('(max-width: 1023px)');
+let sidebarCollapsed = false;
+try { sidebarCollapsed = localStorage.getItem('fids-sidebar') === 'collapsed'; } catch { /* sin almacenamiento */ }
+
+function syncSidebar() {
+  const mobile = mobileNav.matches;
+  const open = shell.classList.contains('sidebar-mobile-open');
+  shell.classList.toggle('sidebar-collapsed', !mobile && sidebarCollapsed);
+  sidebarToggle.setAttribute('aria-expanded', String(mobile ? open : !sidebarCollapsed));
+  sidebarToggle.setAttribute('aria-label', mobile
+    ? (open ? 'Cerrar menú' : 'Abrir menú')
+    : (sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'));
+  sidebarToggle.title = sidebarToggle.getAttribute('aria-label');
+  sidebarOverlay.setAttribute('aria-hidden', String(!(mobile && open)));
+  document.body.classList.toggle('sidebar-open', mobile && open);
+}
+
+function closeSidebarMobile() {
+  if (!mobileNav.matches || !shell.classList.contains('sidebar-mobile-open')) return;
+  shell.classList.remove('sidebar-mobile-open');
+  syncSidebar();
+}
+
+function setSidebarCollapsed(value) {
+  sidebarCollapsed = value;
+  shell.classList.remove('sidebar-hover');
+  try { localStorage.setItem('fids-sidebar', value ? 'collapsed' : 'expanded'); } catch { /* sin almacenamiento */ }
+  syncSidebar();
+}
+
+sidebarToggle.addEventListener('click', () => {
+  if (mobileNav.matches) shell.classList.toggle('sidebar-mobile-open');
+  else setSidebarCollapsed(!sidebarCollapsed);
+  syncSidebar();
+});
+sidebarClose.addEventListener('click', closeSidebarMobile);
+sidebarOverlay.addEventListener('click', closeSidebarMobile);
+sidebar.addEventListener('mouseenter', () => {
+  if (!mobileNav.matches && sidebarCollapsed) shell.classList.add('sidebar-hover');
+});
+sidebar.addEventListener('mouseleave', () => shell.classList.remove('sidebar-hover'));
+mobileNav.addEventListener('change', () => {
+  shell.classList.remove('sidebar-mobile-open');
+  shell.classList.remove('sidebar-hover');
+  syncSidebar();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeSidebarMobile();
+});
+for (const id of ['refreshAll', 'scanBtn', 'importBtn', 'addBtn', 'logoutBtn']) {
+  $(`#${id}`).addEventListener('click', closeSidebarMobile);
+}
+syncSidebar();
+
 // ---------- filtros ----------
 function statusOf(d) {
   if (!d.status) return 'pending';
@@ -262,12 +321,25 @@ function render() {
 
   const all = state.devices;
   const count = (s) => all.filter((d) => statusOf(d) === s).length;
-  const review = all.filter((d) => d.health?.level === 'warn').length;
+  const review = all.filter((d) => statusOf(d) === 'error' || d.health?.level === 'warn').length;
+  const counts = {
+    total: all.length,
+    online: count('online') + count('error'),
+    offline: count('offline'),
+    error: count('error'),
+    review,
+  };
+  for (const [key, value] of Object.entries(counts)) {
+    const el = $(`#statusSeg [data-count="${key}"]`);
+    if (el) el.textContent = value;
+  }
+  const navTotal = $('#navTotal');
+  if (navTotal) navTotal.textContent = all.length;
   $('#summary').innerHTML = [
     kpiHtml('total', 'Total equipos', all.length),
-    kpiHtml('online', 'En línea', count('online') + count('error')),
-    kpiHtml('offline', 'Caídos', count('offline')),
-    kpiHtml('error', 'Con error', count('error')),
+    kpiHtml('online', 'En línea', counts.online),
+    kpiHtml('offline', 'Caídos', counts.offline),
+    kpiHtml('error', 'Con error', counts.error),
     kpiHtml('review', 'A revisar', review),
   ].join('');
   const round = $('#roundState');
@@ -488,7 +560,7 @@ $('#refreshAll').addEventListener('click', async () => {
   load();
 });
 $('#search').addEventListener('input', (e) => { state.filter.q = e.target.value.trim().toLowerCase(); render(); });
-$('#group').addEventListener('change', (e) => { state.filter.group = e.target.value; savePrefs(); render(); });
+$('#group').addEventListener('change', (e) => { state.filter.group = e.target.value; savePrefs(); render(); closeSidebarMobile(); });
 
 function bindSeg(id, get, set) {
   const seg = $(id);
@@ -500,6 +572,7 @@ function bindSeg(id, get, set) {
     sync();
     savePrefs();
     render();
+    closeSidebarMobile();
   });
   sync();
 }

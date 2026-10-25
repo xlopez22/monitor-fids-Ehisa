@@ -6,6 +6,19 @@ const togglePw = document.querySelector('#togglePw');
 
 document.querySelector('#year').textContent = new Date().getFullYear();
 
+// Video local de fondo: se intenta reproducir y se funde cuando ya hay imagen.
+const video = document.querySelector('#loginVideo');
+if (video) {
+  const showVideo = () => video.classList.add('is-ready');
+  if (video.readyState >= 2) showVideo();
+  video.addEventListener('loadeddata', showVideo, { once: true });
+  video.addEventListener('playing', showVideo, { once: true });
+  const play = () => { const p = video.play(); if (p) p.catch(() => { /* queda el póster */ }); };
+  play();
+  document.addEventListener('pointerdown', play, { once: true });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) play(); });
+}
+
 // Mostrar / ocultar la contraseña sin salir del campo
 togglePw.addEventListener('click', () => {
   const show = pw.type === 'password';
@@ -44,6 +57,6 @@ form.addEventListener('submit', async (e) => {
     form.elements.password.select();
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Entrar';
+    btn.textContent = 'Iniciar sesión';
   }
 });

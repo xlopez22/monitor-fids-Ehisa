@@ -16,6 +16,8 @@ test('la CSP no permite scripts inline ni objetos y limita la conexión al panel
   assert.match(csp, /object-src 'none'/);
   assert.match(csp, /frame-ancestors 'none'/);
   assert.match(csp, /connect-src 'self' ws:\/\/127\.0\.0\.1:8080 wss:\/\/fids\.local/);
+  assert.match(csp, /media-src 'self'/);
+  assert.doesNotMatch(csp, /media-src 'none'/);
 });
 
 test('wsOrigins ignora orígenes inválidos y convierte http/https', () => {

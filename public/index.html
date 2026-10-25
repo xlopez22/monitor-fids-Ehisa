@@ -3,83 +3,145 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#0164ff">
   <title>FIDS Monitor · EHISA</title>
   <link rel="icon" type="image/png" href="favicon.png">
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbarInner">
-      <div class="brand">
-        <picture class="brandLogo">
-          <source srcset="img/ehisa-logo-negative.png" media="(prefers-color-scheme: dark)">
-          <img src="img/ehisa-logo.png" alt="EHISA">
-        </picture>
-        <span class="brandSep" aria-hidden="true"></span>
-        <div class="brandCopy">
-          <h1>FIDS Monitor</h1>
-          <p>Pantallas de información de vuelo</p>
+  <div class="appShell" id="appShell">
+    <aside class="sidebar" id="sidebar" aria-label="Opciones del panel">
+      <div class="sidebarHead">
+        <a class="sidebarBrand" href="/" aria-label="FIDS Monitor · inicio">
+          <img class="brandFull logoLight" src="img/ehisa-logo.png" alt="EHISA">
+          <img class="brandFull logoDark" src="img/ehisa-logo-negative.png" alt="EHISA">
+          <img class="brandMark logoLight" src="img/ehisa-symbol.png" alt="">
+          <img class="brandMark logoDark" src="img/ehisa-symbol-negative.png" alt="">
+          <span class="sidebarBrandText"><b>FIDS Monitor</b><small>EHISA</small></span>
+        </a>
+        <button type="button" class="btn btnIcon btnSubtle sidebarClose" id="sidebarClose" aria-label="Cerrar menú">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+
+      <div class="sidebarBody">
+        <p class="sidebarLabel">Panel</p>
+        <nav class="sidebarNav" aria-label="Navegación principal">
+          <a class="navItem isActive" href="/" aria-current="page" title="Resumen">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+            <span class="navText">Resumen</span>
+            <span class="navBadge" id="navTotal">0</span>
+          </a>
+        </nav>
+
+        <p class="sidebarLabel">Estado</p>
+        <div class="navList" id="statusSeg" role="group" aria-label="Filtrar por estado">
+          <button type="button" data-v="all" class="navItem on" title="Todos">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            <span class="navText">Todos</span><span class="navBadge" data-count="total">0</span>
+          </button>
+          <button type="button" data-v="online" class="navItem" title="En línea">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>
+            <span class="navText">En línea</span><span class="navBadge" data-count="online">0</span>
+          </button>
+          <button type="button" data-v="offline" class="navItem" title="Caídos">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2 2 20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 13a10 10 0 0 1 4.2-2.5"/><path d="M15 10.5A10 10 0 0 1 19 13"/><path d="M12 20h.01"/></svg>
+            <span class="navText">Caídos</span><span class="navBadge" data-count="offline">0</span>
+          </button>
+          <button type="button" data-v="error" class="navItem" title="Con error">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg>
+            <span class="navText">Con error</span><span class="navBadge" data-count="error">0</span>
+          </button>
+          <button type="button" data-v="review" class="navItem" title="Pantallas con alerta o con error">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span class="navText">A revisar</span><span class="navBadge" data-count="review">0</span>
+          </button>
         </div>
-        <span class="roundState" id="roundState" hidden><span class="spinner" aria-hidden="true"></span>Actualizando</span>
+
+        <p class="sidebarLabel">Zona</p>
+        <div class="sidebarField">
+          <label class="srOnly" for="group">Filtrar por zona</label>
+          <select id="group" aria-label="Filtrar por zona"><option value="">Todas las zonas</option></select>
+        </div>
+
+        <p class="sidebarLabel">Vista</p>
+        <div class="navList" id="viewSeg" role="group" aria-label="Forma de visualización">
+          <button type="button" data-v="grid" class="navItem on" title="Cuadrícula" aria-label="Vista de cuadrícula">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            <span class="navText">Cuadrícula</span>
+          </button>
+          <button type="button" data-v="list" class="navItem" title="Lista" aria-label="Vista de lista">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            <span class="navText">Lista</span>
+          </button>
+        </div>
+
+        <p class="sidebarLabel">Acciones</p>
+        <div class="sidebarActions">
+          <button id="refreshAll" type="button" class="sideAction" title="Vuelve a revisar todos los equipos ahora">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"/></svg>
+            <span class="actText">Actualizar todo</span>
+          </button>
+          <button id="scanBtn" type="button" class="sideAction" title="Busca en la red equipos con VNC que no están en la lista">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2M11 8v6M8 11h6"/></svg>
+            <span class="actText">Buscar equipos</span>
+          </button>
+          <button id="importBtn" type="button" class="sideAction" title="Importa el inventario desde un archivo Excel">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            <span class="actText">Importar Excel</span>
+          </button>
+          <input id="importFile" type="file" accept=".xlsx" hidden>
+          <button id="addBtn" type="button" class="sideAction primary" title="Agregar un equipo al inventario">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            <span class="actText">Agregar equipo</span>
+          </button>
+        </div>
       </div>
 
-      <div class="actions">
-        <button id="refreshAll" class="btn btnGhost" title="Vuelve a revisar todos los equipos ahora">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"/></svg>
-          <span>Actualizar</span>
-        </button>
-        <button id="scanBtn" class="btn btnGhost" title="Busca en la red equipos con VNC que no están en la lista">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2M11 8v6M8 11h6"/></svg>
-          <span>Buscar</span>
-        </button>
-        <button id="importBtn" class="btn btnGhost" title="Importa el inventario desde un archivo Excel">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-          <span>Importar</span>
-        </button>
-        <input id="importFile" type="file" accept=".xlsx" hidden>
-        <button id="addBtn" class="btn btnPrimary">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          <span>Agregar equipo</span>
-        </button>
-        <span class="actionsSep" aria-hidden="true"></span>
-        <button id="logoutBtn" class="btn btnIcon" title="Cerrar la sesión de este panel" aria-label="Cerrar sesión">
+      <div class="sidebarFoot">
+        <div class="sidebarSession">
+          <span class="dot online" aria-hidden="true"></span>
+          <span class="footText"><b>Sesión local</b><small>EHISA · FIDS</small></span>
+        </div>
+        <button id="logoutBtn" type="button" class="sideAction danger" title="Cerrar la sesión de este panel" aria-label="Cerrar sesión">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2M10 12h11m0 0-3-3m3 3-3 3"/></svg>
+          <span class="actText">Cerrar sesión</span>
         </button>
       </div>
+    </aside>
+
+    <div class="sidebarOverlay" id="sidebarOverlay" aria-hidden="true"></div>
+
+    <div class="appMain">
+      <header class="topbar">
+        <div class="topbarInner">
+          <button type="button" class="btn btnIcon topbarMenu" id="sidebarToggle" aria-label="Contraer menú" aria-expanded="true" aria-controls="sidebar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <div class="topbarTitle">
+            <p class="crumb">EHISA · Pantallas de información de vuelo</p>
+            <h1>Panel de monitoreo</h1>
+          </div>
+          <span class="roundState" id="roundState" hidden><span class="spinner" aria-hidden="true"></span>Actualizando</span>
+          <div class="topbarSearch searchBox">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+            <input id="search" type="search" placeholder="Buscar nombre, ubicación o IP…" autocomplete="off" aria-label="Buscar equipos">
+          </div>
+          <button type="button" class="themeToggle" data-theme-toggle aria-pressed="false" aria-label="Cambiar a tema oscuro">
+            <svg class="themeIconMoon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+            <svg class="themeIconSun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="page">
+        <section class="stats" id="summary" aria-label="Resumen del inventario"></section>
+        <div id="groups"></div>
+      </main>
     </div>
-  </header>
-
-  <main class="page">
-    <section class="stats" id="summary" aria-label="Resumen del inventario"></section>
-
-    <section class="toolbar" aria-label="Búsqueda y filtros">
-      <div class="searchBox">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
-        <input id="search" type="search" placeholder="Buscar nombre, ubicación o IP…" autocomplete="off" aria-label="Buscar equipos">
-      </div>
-      <select id="group" aria-label="Filtrar por zona"><option value="">Todas las zonas</option></select>
-      <div class="seg" id="statusSeg" role="group" aria-label="Filtrar por estado">
-        <button data-v="all" class="on">Todos</button>
-        <button data-v="online">En línea</button>
-        <button data-v="offline">Caídos</button>
-        <button data-v="error">Con error</button>
-        <button data-v="review" title="Pantallas con alerta (NG-Client no visible, negra, en blanco, distinta a lo normal) o con error">Revisar</button>
-      </div>
-      <span class="toolbarSpacer" aria-hidden="true"></span>
-      <div class="seg segIcons" id="viewSeg" role="group" aria-label="Forma de visualización">
-        <button data-v="grid" class="on" title="Cuadrícula" aria-label="Vista de cuadrícula">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-        </button>
-        <button data-v="list" title="Lista" aria-label="Vista de lista">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-        </button>
-      </div>
-    </section>
-
-    <div id="groups"></div>
-  </main>
+  </div>
 
   <div id="toast" class="toast" hidden></div>
 
