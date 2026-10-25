@@ -3,23 +3,47 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0164ff">
   <meta name="robots" content="noindex">
-  <title>Acceso — FIDS Monitor</title>
+  <title>Acceso · FIDS Monitor</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="loginBody">
-  <main class="loginCard">
-    <h1>FIDS Monitor</h1>
-    <p class="muted loginIntro">Acceso restringido. Introduce la contraseña de esta instalación.</p>
-    <form id="loginForm">
-      <label>Contraseña
-        <input type="password" name="password" autocomplete="current-password" required autofocus>
-      </label>
-      <p id="loginErr" class="formErr" hidden></p>
-      <button type="submit" class="primary" id="loginBtn">Entrar</button>
-    </form>
-    <p class="muted small">La contraseña se configura con <code>npm run set-password</code>.</p>
+  <div class="loginBg" aria-hidden="true"></div>
+
+  <main class="loginStage">
+    <div class="loginWrap">
+      <section class="loginCard" aria-labelledby="loginTitle">
+        <div class="loginLogoWrap">
+          <img class="logoLight" src="img/ehisa-logo.png" alt="EHISA">
+          <img class="logoDark" src="img/ehisa-logo-negative.png" alt="EHISA">
+        </div>
+
+        <div class="loginFormWrap">
+          <h1 id="loginTitle">FIDS Monitor</h1>
+          <form id="loginForm">
+            <p id="loginErr" class="formErr" role="alert" hidden></p>
+            <div class="loginField">
+              <label for="password">Contraseña <span class="req" aria-hidden="true">*</span></label>
+              <div class="pwWrap">
+                <input id="password" type="password" name="password" autocomplete="current-password" placeholder="••••••••" required autofocus>
+                <button type="button" class="eyeBtn" id="togglePw" aria-controls="password" aria-pressed="false" aria-label="Mostrar contraseña">
+                  <svg class="eyeOff" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17.3 17.3 0 0 1-3.2 4.1"/><path d="M6.5 6.5A17.6 17.6 0 0 0 2 12s3.5 7 10 7a10.6 10.6 0 0 0 5.5-1.5"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+                  <svg class="eyeOn" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <button type="submit" class="primary loginSubmit" id="loginBtn">Iniciar sesión</button>
+          </form>
+        </div>
+      </section>
+
+      <p class="loginCopyright">© <span id="year">2026</span> EHISA. Todos los derechos reservados.</p>
+    </div>
   </main>
+
   <script src="login.js"></script>
 </body>
 </html>

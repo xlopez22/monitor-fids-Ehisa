@@ -36,6 +36,26 @@ function esc(s) {
 function cssEsc(s) {
   return window.CSS?.escape ? CSS.escape(String(s)) : String(s).replace(/["\\]/g, '\\$&');
 }
+
+// Iconos de la interfaz (SVG local, sin depender de fuentes de iconos)
+const ICONS = {
+  total: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+  online: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>',
+  offline: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2 2 20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 13a10 10 0 0 1 4.2-2.5"/><path d="M15 10.5A10 10 0 0 1 19 13"/><path d="M12 20h.01"/></svg>',
+  error: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg>',
+  review: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+};
+const STATUS_LABEL = { online: 'En línea', error: 'Con error', offline: 'Caído', pending: 'Revisando' };
+
+function kpiHtml(kind, label, value) {
+  return `<div class="kpi">
+    <span class="kpiIcon ${kind}">${ICONS[kind]}</span>
+    <div class="kpiBody"><span class="kpiLabel">${label}</span><strong class="kpiValue">${value}</strong></div>
+  </div>`;
+}
+
 let toastTimer;
 function toast(msg, isError = false) {
   const t = $('#toast');
@@ -105,17 +125,17 @@ function matches(d) {
 
 // ---------- tarjetas y filas ----------
 const ISSUES = {
-  desktop: ['⚠ NG-Client no visible', 'Se ve el escritorio de Windows en lugar del tablero de vuelos'],
-  black: ['⚠ Pantalla negra', 'La pantalla está completamente negra'],
-  blank: ['⚠ Pantalla en blanco', 'La pantalla es de un solo color'],
-  baseline: ['⚠ Distinta a lo normal', 'Se ve muy diferente a la pantalla que marcaste como normal'],
+  desktop: ['NG-Client', 'Se ve el escritorio de Windows en lugar del tablero de vuelos'],
+  black: ['Pantalla negra', 'La pantalla está completamente negra'],
+  blank: ['Pantalla en blanco', 'La pantalla es de un solo color'],
+  baseline: ['Distinta a lo normal', 'Se ve muy diferente a la pantalla que marcaste como normal'],
 };
 // Alertas de la pantalla (deducidas de la imagen) + "sin cambios" como dato
 function healthHtml(d) {
   const h = d.health;
   if (!h) return '';
   const warn = h.issues.map((i) => `<span class="hb warn" title="${ISSUES[i][1]}">${ISSUES[i][0]}</span>`).join('');
-  const frozen = h.frozen ? `<span class="hb info" title="La imagen no ha cambiado desde entonces">⏸ sin cambios <span data-ts="${h.unchangedSince}"></span></span>` : '';
+  const frozen = h.frozen ? `<span class="hb info" title="La imagen no ha cambiado desde entonces">Sin cambios <span data-ts="${h.unchangedSince}"></span></span>` : '';
   return warn || frozen ? `<div class="health">${warn}${frozen}</div>` : '';
 }
 
@@ -134,44 +154,53 @@ function thumbHtml(d) {
 }
 const viewUrl = (d, force) => `/view.html?ip=${encodeURIComponent(d.ip)}${force ? '&force=1' : ''}`;
 function badges(d) {
-  return `${d.hasPassword ? '<span class="badge" title="Usa contraseña propia">🔑</span>' : ''}${d.manual ? '<span class="badge" title="Agregado a mano">manual</span>' : ''}`;
+  return `${d.hasPassword ? '<span class="badge" title="Usa contraseña propia">Clave propia</span>' : ''}${d.manual ? '<span class="badge" title="Agregado a mano">Manual</span>' : ''}`;
 }
-function actionBtns(d) {
+function actionBtns(d, withRetry = true) {
   const busy = state.refreshing.has(d.ip);
-  const retry = d.status && !d.status.online
-    ? `<a class="btnLink small" href="${viewUrl(d, true)}" title="Abrir el visor aunque el equipo aparezca caído (por si acaba de encender)">Intentar de todos modos</a>`
+  const retry = withRetry && d.status && !d.status.online
+    ? `<a class="btnLink small retryLink" href="${viewUrl(d, true)}" title="Abrir el visor aunque el equipo aparezca caído (por si acaba de encender)">Intentar de todos modos</a>`
     : '';
-  return `${retry}<button class="icon" data-act="refresh" data-ip="${esc(d.ip)}" title="Volver a sacar la miniatura" ${busy ? 'disabled' : ''}>${busy ? '…' : '↻'}</button>
-    <button class="icon" data-act="edit" data-ip="${esc(d.ip)}" title="Editar equipo">✎</button>`;
+  return `${retry}<button class="icon" data-act="refresh" data-ip="${esc(d.ip)}" title="Volver a sacar la miniatura" aria-label="Actualizar ${esc(d.name)}" ${busy ? 'disabled' : ''}>${busy ? '…' : ICONS.refresh}</button>
+    <button class="icon" data-act="edit" data-ip="${esc(d.ip)}" title="Editar equipo" aria-label="Editar ${esc(d.name)}">${ICONS.edit}</button>`;
 }
 function card(d) {
   const st = statusOf(d);
   const off = st === 'offline';
   // Los caídos no son enlace: el visor solo se abre con "Intentar de todos modos"
+  const statusPill = `<span class="cardStatus"><span class="dot ${st}"></span>${STATUS_LABEL[st]}</span>`;
   const thumb = off
-    ? `<div class="thumb">${thumbHtml(d)}</div>`
-    : `<a class="thumb" href="${viewUrl(d)}" title="Abrir ${esc(d.name)} en vivo${d.resolution ? ' — ' + esc(d.resolution) : ''}">${thumbHtml(d)}</a>`;
+    ? `<div class="thumb">${thumbHtml(d)}${statusPill}</div>`
+    : `<a class="thumb" href="${viewUrl(d)}" title="Abrir ${esc(d.name)} en vivo${d.resolution ? ' — ' + esc(d.resolution) : ''}">${thumbHtml(d)}${statusPill}</a>`;
   const name = off ? `<span class="name">${esc(d.name)}</span>` : `<a class="name" href="${viewUrl(d)}">${esc(d.name)}</a>`;
+  const retry = off
+    ? `<a class="btnLink small retryLink" href="${viewUrl(d, true)}" title="Abrir el visor aunque el equipo aparezca caído (por si acaba de encender)">Intentar de todos modos</a>`
+    : '';
   return `
     <div class="card ${st} ${d.health?.level === 'warn' ? 'warnScreen' : ''}" data-ip="${esc(d.ip)}">
       ${thumb}
       <div class="info">
-        <div class="row"><span class="dot ${st}"></span>${name}${badges(d)}<span class="ip">${esc(d.ip)}</span></div>
-        <div class="row"><span class="desc">${esc(d.description || d.model || '')}</span><span class="btns">${actionBtns(d)}</span></div>
+        <div class="row cardTitle"><span class="dot ${st}"></span>${name}<span class="ip">${esc(d.ip)}</span></div>
+        <div class="row"><span class="desc">${esc(d.description || d.model || '')}</span></div>
         ${healthHtml(d)}
         ${d.thumbError && d.status?.online ? `<div class="err">${esc(d.thumbError)}</div>` : ''}
+        ${retry}
+        <div class="cardFoot">
+          <div class="badges">${badges(d)}</div>
+          <div class="btns">${actionBtns(d, false)}</div>
+        </div>
       </div>
     </div>`;
 }
 function rowHtml(d) {
   const st = statusOf(d);
   const off = st === 'offline';
-  const label = { online: 'En línea', error: 'Con error', offline: 'Caído', pending: 'Revisando' }[st];
+  const label = STATUS_LABEL[st];
   const img = d.thumbAt ? `<img ${off ? 'class="stale"' : ''} src="/thumb/${encodeURIComponent(d.ip)}?t=${d.thumbAt}" alt="">` : '';
   return `
     <tr class="${st}" data-ip="${esc(d.ip)}">
       <td class="mini">${off ? `<span class="miniBox">${img}</span>` : `<a href="${viewUrl(d)}">${img}</a>`}</td>
-      <td class="st"><span class="dot ${st}"></span> ${label}</td>
+      <td class="st"><span class="pill ${st}"><span class="dot ${st}"></span>${label}</span></td>
       <td>${off ? `<span class="name">${esc(d.name)}</span>` : `<a class="name" href="${viewUrl(d)}">${esc(d.name)}</a>`} ${badges(d)}</td>
       <td class="desc">${esc(d.description || '')}</td>
       <td class="ip">${esc(d.ip)}</td>
@@ -213,7 +242,7 @@ function render() {
         : `<div class="tableWrap"><table class="list"><thead><tr><th></th><th>Estado</th><th>Nombre</th><th>Ubicación</th><th>IP</th><th>Resolución</th><th>Captura</th><th>Pantalla</th><th>Error</th><th></th></tr></thead><tbody>${items}</tbody></table></div>`;
     };
     $('#groups').innerHTML = list.length
-      ? [...groups.values()].map((g) => `<section><h2 data-group="${esc(g.key)}">${groupHeader(g)}</h2>${body(g)}</section>`).join('')
+      ? [...groups.values()].map((g) => `<section class="group"><div class="groupHead"><h2 data-group="${esc(g.key)}">${groupHeader(g)}</h2></div>${body(g)}</section>`).join('')
       : '<div class="empty">Ningún equipo coincide con el filtro.</div>';
   } else {
     for (const g of groups.values()) {
@@ -233,12 +262,16 @@ function render() {
 
   const all = state.devices;
   const count = (s) => all.filter((d) => statusOf(d) === s).length;
-  $('#summary').innerHTML = `<span>Total <b>${all.length}</b></span>
-    <span class="ok">En línea <b>${count('online') + count('error')}</b></span>
-    <span class="bad">Caídos <b>${count('offline')}</b></span>
-    ${count('error') ? `<span class="warn">Con error <b>${count('error')}</b></span>` : ''}
-    ${(() => { const n = all.filter((d) => d.health?.level === 'warn').length; return n ? `<span class="warn">Pantalla a revisar <b>${n}</b></span>` : ''; })()}
-    ${state.roundRunning ? '<span class="muted">revisando…</span>' : ''}`;
+  const review = all.filter((d) => d.health?.level === 'warn').length;
+  $('#summary').innerHTML = [
+    kpiHtml('total', 'Total equipos', all.length),
+    kpiHtml('online', 'En línea', count('online') + count('error')),
+    kpiHtml('offline', 'Caídos', count('offline')),
+    kpiHtml('error', 'Con error', count('error')),
+    kpiHtml('review', 'A revisar', review),
+  ].join('');
+  const round = $('#roundState');
+  if (round) round.hidden = !state.roundRunning;
 }
 
 function fillGroupSelects() {
@@ -264,7 +297,9 @@ async function load() {
     if (groupsChanged) fillGroupSelects();
     render();
   } catch (e) {
-    $('#summary').innerHTML = `<span class="bad">Sin conexión con el servidor: ${esc(e.message)}</span>`;
+    $('#summary').innerHTML = `<div class="notice">Sin conexión con el servidor: ${esc(e.message)}</div>`;
+    const round = $('#roundState');
+    if (round) round.hidden = true;
   }
 }
 

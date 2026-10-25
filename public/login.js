@@ -1,6 +1,20 @@
 const form = document.querySelector('#loginForm');
 const err = document.querySelector('#loginErr');
 const btn = document.querySelector('#loginBtn');
+const pw = form.elements.password;
+const togglePw = document.querySelector('#togglePw');
+
+document.querySelector('#year').textContent = new Date().getFullYear();
+
+// Mostrar / ocultar la contraseña sin salir del campo
+togglePw.addEventListener('click', () => {
+  const show = pw.type === 'password';
+  pw.type = show ? 'text' : 'password';
+  togglePw.setAttribute('aria-pressed', String(show));
+  togglePw.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+  pw.focus();
+});
+pw.addEventListener('input', () => { err.hidden = true; });
 
 // Si ya hay sesión, no tiene sentido mostrar el formulario.
 fetch('/api/session')

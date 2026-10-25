@@ -3,59 +3,123 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FIDS Monitor</title>
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0164ff">
+  <title>FIDS Monitor · EHISA</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="top">
-    <div class="row1">
-      <h1>FIDS Monitor</h1>
-      <div class="summary" id="summary"></div>
+  <header class="topbar">
+    <div class="topbarInner">
+      <div class="brand">
+        <picture class="brandLogo">
+          <source srcset="img/ehisa-logo-negative.png" media="(prefers-color-scheme: dark)">
+          <img src="img/ehisa-logo.png" alt="EHISA">
+        </picture>
+        <span class="brandSep" aria-hidden="true"></span>
+        <div class="brandCopy">
+          <h1>FIDS Monitor</h1>
+          <p>Pantallas de información de vuelo</p>
+        </div>
+        <span class="roundState" id="roundState" hidden><span class="spinner" aria-hidden="true"></span>Actualizando</span>
+      </div>
+
       <div class="actions">
-        <button id="refreshAll" title="Vuelve a revisar todos los equipos ahora">↻ Actualizar todo</button>
-        <button id="addBtn">＋ Agregar equipo</button>
-        <button id="scanBtn" title="Busca en la red equipos con VNC que no están en la lista">Buscar equipos nuevos</button>
-        <button id="importBtn">Importar Excel</button>
+        <button id="refreshAll" class="btn btnGhost" title="Vuelve a revisar todos los equipos ahora">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"/></svg>
+          <span>Actualizar</span>
+        </button>
+        <button id="scanBtn" class="btn btnGhost" title="Busca en la red equipos con VNC que no están en la lista">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2M11 8v6M8 11h6"/></svg>
+          <span>Buscar</span>
+        </button>
+        <button id="importBtn" class="btn btnGhost" title="Importa el inventario desde un archivo Excel">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          <span>Importar</span>
+        </button>
         <input id="importFile" type="file" accept=".xlsx" hidden>
-        <button id="logoutBtn" title="Cerrar la sesión de este panel">Salir</button>
+        <button id="addBtn" class="btn btnPrimary">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Agregar equipo</span>
+        </button>
+        <span class="actionsSep" aria-hidden="true"></span>
+        <button id="logoutBtn" class="btn btnIcon" title="Cerrar la sesión de este panel" aria-label="Cerrar sesión">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2M10 12h11m0 0-3-3m3 3-3 3"/></svg>
+        </button>
       </div>
     </div>
-    <div class="row2">
-      <input id="search" type="search" placeholder="Buscar nombre, ubicación o IP…" autocomplete="off">
-      <select id="group"><option value="">Todas las zonas</option></select>
-      <div class="seg" id="statusSeg" role="group" aria-label="Estado">
+  </header>
+
+  <main class="page">
+    <section class="stats" id="summary" aria-label="Resumen del inventario"></section>
+
+    <section class="toolbar" aria-label="Búsqueda y filtros">
+      <div class="searchBox">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+        <input id="search" type="search" placeholder="Buscar nombre, ubicación o IP…" autocomplete="off" aria-label="Buscar equipos">
+      </div>
+      <select id="group" aria-label="Filtrar por zona"><option value="">Todas las zonas</option></select>
+      <div class="seg" id="statusSeg" role="group" aria-label="Filtrar por estado">
         <button data-v="all" class="on">Todos</button>
         <button data-v="online">En línea</button>
         <button data-v="offline">Caídos</button>
         <button data-v="error">Con error</button>
         <button data-v="review" title="Pantallas con alerta (NG-Client no visible, negra, en blanco, distinta a lo normal) o con error">Revisar</button>
       </div>
-      <div class="seg" id="viewSeg" role="group" aria-label="Vista">
-        <button data-v="grid" class="on" title="Cuadrícula">▦ Cuadrícula</button>
-        <button data-v="list" title="Lista">☰ Lista</button>
+      <span class="toolbarSpacer" aria-hidden="true"></span>
+      <div class="seg segIcons" id="viewSeg" role="group" aria-label="Forma de visualización">
+        <button data-v="grid" class="on" title="Cuadrícula" aria-label="Vista de cuadrícula">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        </button>
+        <button data-v="list" title="Lista" aria-label="Vista de lista">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        </button>
       </div>
-    </div>
-  </header>
-  <main id="groups"></main>
+    </section>
+
+    <div id="groups"></div>
+  </main>
+
   <div id="toast" class="toast" hidden></div>
 
   <!-- Agregar / editar equipo -->
   <dialog id="devDialog">
     <form id="devForm" method="dialog">
-      <h2 id="devTitle">Agregar equipo</h2>
-      <label>Nombre <input name="name" placeholder="SAP-GATE-08" autocomplete="off"></label>
-      <label>IP <input name="ip" required placeholder="192.168.10.120" autocomplete="off"></label>
-      <label>Ubicación / descripción <input name="description" autocomplete="off"></label>
+      <div class="dialogHead">
+        <div>
+          <h2 id="devTitle">Agregar equipo</h2>
+          <p class="dialogSub">Datos del reproductor y acceso VNC.</p>
+        </div>
+        <button type="button" class="btn btnIcon btnSubtle" data-close aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+
+      <label>Nombre
+        <input name="name" placeholder="SAP-GATE-08" autocomplete="off">
+      </label>
+      <label>IP
+        <input name="ip" required placeholder="192.168.10.120" autocomplete="off" inputmode="decimal">
+      </label>
+      <label>Ubicación / descripción
+        <input name="description" autocomplete="off" placeholder="Sala de embarque, puerta 8">
+      </label>
       <div class="two">
-        <label>Zona <select name="group"></select></label>
-        <label>Puerto VNC <input name="port" type="number" min="1" max="65535" placeholder="5900"></label>
+        <label>Zona
+          <select name="group"></select>
+        </label>
+        <label>Puerto VNC
+          <input name="port" type="number" min="1" max="65535" placeholder="5900">
+        </label>
       </div>
       <label>Contraseña VNC propia
         <input name="password" type="password" maxlength="8" autocomplete="new-password" placeholder="Vacío = usar la general (máx. 8)">
       </label>
       <label class="chk" id="clearPwRow" hidden><input type="checkbox" name="clearPassword"> Quitar la contraseña propia (volver a la general)</label>
+
       <fieldset id="screenRefs" class="refs" hidden>
-        <legend>Pantalla</legend>
+        <legend>Referencia de pantalla</legend>
         <p class="muted small" id="refsInfo"></p>
         <div class="refBtns">
           <button type="button" id="setBaseline" title="Guarda la pantalla actual como la normal de este equipo; avisará si después se ve muy distinta">✓ Así se ve normal</button>
@@ -63,6 +127,7 @@
           <button type="button" id="markDesktop" title="Usa el color de fondo de esta pantalla para reconocer el escritorio de Windows en todos los equipos">Esto es el escritorio (NG-Client no visible)</button>
         </div>
       </fieldset>
+
       <p class="formErr" id="devErr" hidden></p>
       <div class="dlgBtns">
         <button type="button" id="devDelete" class="danger" hidden>Eliminar</button>
@@ -75,13 +140,21 @@
 
   <!-- Buscar equipos nuevos -->
   <dialog id="scanDialog" class="wide">
-    <h2>Buscar equipos nuevos</h2>
-    <p class="muted">Revisa la red buscando equipos con VNC (puerto 5900) que no estén en la lista, y prueba en cada uno la contraseña general.</p>
+    <div class="dialogHead">
+      <div>
+        <h2>Buscar equipos nuevos</h2>
+        <p class="dialogSub">Equipos con VNC (puerto 5900) que todavía no están en el inventario.</p>
+      </div>
+      <button type="button" class="btn btnIcon btnSubtle" data-close aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <p class="muted">Revisa la red y prueba en cada equipo la contraseña general. Puede tardar un minuto.</p>
     <form id="scanForm" class="scanBar">
       <label>Red <input name="prefix" placeholder="192.168.10" autocomplete="off"></label>
       <button type="submit" class="primary" id="scanGo">Buscar</button>
       <span class="spacer"></span>
-      <button type="button" data-close>Cerrar</button>
+      <button type="button" data-close>Cancelar</button>
     </form>
     <div id="scanResults"></div>
   </dialog>

@@ -3,45 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FIDS Visor</title>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#1e2444">
+  <title>Visor · FIDS Monitor</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="stylesheet" href="view.css">
 </head>
 <body>
   <div class="bar">
-    <button id="back" class="back" title="Cerrar la sesión y volver al tablero (Alt+← cuando no estás controlando)">← Tablero</button>
-    <b id="title">…</b>
-    <span id="status" class="status">Conectando…</span>
-    <span class="spacer"></span>
-    <label title="0 = más rápido, 9 = mejor imagen">Calidad <input id="quality" type="range" min="0" max="9" value="4"></label>
-    <label title="0 = menos CPU, 9 = menos ancho de banda">Compresión <input id="compression" type="range" min="0" max="9" value="7"></label>
-    <label title="Tamaño del puntero sobre la pantalla remota">Puntero
-      <select id="pointer">
-        <option value="normal">Del equipo</option>
-        <option value="arrow">Flecha</option>
-        <option value="big">Grande</option>
-        <option value="huge">Muy grande</option>
-      </select>
-    </label>
-    <button id="fast" title="Imagen más liviana para que responda más rápido. Se activa sola al tomar control.">⚡ Rápido</button>
-    <button id="control" title="Pantalla completa y TODAS las teclas (Windows, Alt+Tab…) van al equipo remoto">Tomar control</button>
-    <span class="keys" title="Mantener presionada en el equipo remoto (clic para presionar, otro clic para soltar)">
-      <button data-hold="ctrl">Ctrl</button>
-      <button data-hold="alt">Alt</button>
-      <button data-hold="shift">Shift</button>
-      <button data-hold="win">⊞</button>
-    </span>
-    <span class="keys" title="Enviar al equipo remoto">
-      <button data-keys="win" title="Tecla Windows">⊞ Win</button>
-      <button data-keys="alttab">Alt+Tab</button>
-      <button data-keys="esc">Esc</button>
-      <button data-keys="ctrlesc">Ctrl+Esc</button>
-      <button data-keys="ctrlc" title="Copiar en el equipo remoto (llega a tu portapapeles)">Ctrl+C</button>
-      <button id="ctrlv" title="Pega en el equipo remoto lo que tienes copiado en tu PC">Ctrl+V</button>
-      <button id="cad">Ctrl+Alt+Supr</button>
-    </span>
-    <button id="restartNg" title="Cierra y vuelve a abrir NG-Client en el equipo (como el acceso directo START DDS CLIENT)">↻ NG-Client</button>
-    <button id="fullscreen">Pantalla completa</button>
-    <button id="reconnect">Reconectar</button>
+    <div class="barLead">
+      <img class="brandMark" src="img/ehisa-symbol-negative.png" alt="EHISA">
+      <span class="barDivider" aria-hidden="true"></span>
+      <button id="back" class="back" title="Cerrar la sesión y volver al tablero (Alt+← cuando no estás controlando)">← Tablero</button>
+      <div class="barTitle">
+        <b id="title">…</b>
+        <span id="status" class="status">Conectando…</span>
+      </div>
+    </div>
+
+    <div class="barControls">
+      <label title="0 = más rápido, 9 = mejor imagen">Calidad <input id="quality" type="range" min="0" max="9" value="4"></label>
+      <label title="0 = menos CPU, 9 = menos ancho de banda">Compresión <input id="compression" type="range" min="0" max="9" value="7"></label>
+      <label title="Tamaño del puntero sobre la pantalla remota">Puntero
+        <select id="pointer">
+          <option value="normal">Del equipo</option>
+          <option value="arrow">Flecha</option>
+          <option value="big">Grande</option>
+          <option value="huge">Muy grande</option>
+        </select>
+      </label>
+      <button id="fast" title="Imagen más liviana para que responda más rápido. Se activa sola al tomar control.">⚡ Rápido</button>
+      <button id="control" title="Pantalla completa y TODAS las teclas (Windows, Alt+Tab…) van al equipo remoto">Tomar control</button>
+      <span class="keys" title="Mantener presionada en el equipo remoto (clic para presionar, otro clic para soltar)">
+        <button data-hold="ctrl">Ctrl</button>
+        <button data-hold="alt">Alt</button>
+        <button data-hold="shift">Shift</button>
+        <button data-hold="win">⊞</button>
+      </span>
+      <span class="keys" title="Enviar al equipo remoto">
+        <button data-keys="win" title="Tecla Windows">⊞ Win</button>
+        <button data-keys="alttab">Alt+Tab</button>
+        <button data-keys="esc">Esc</button>
+        <button data-keys="ctrlesc">Ctrl+Esc</button>
+        <button data-keys="ctrlc" title="Copiar en el equipo remoto (llega a tu portapapeles)">Ctrl+C</button>
+        <button id="ctrlv" title="Pega en el equipo remoto lo que tienes copiado en tu PC">Ctrl+V</button>
+        <button id="cad">Ctrl+Alt+Supr</button>
+      </span>
+      <button id="restartNg" title="Cierra y vuelve a abrir NG-Client en el equipo (como el acceso directo START DDS CLIENT)">↻ NG-Client</button>
+      <button id="fullscreen">Pantalla completa</button>
+      <button id="reconnect">Reconectar</button>
+    </div>
   </div>
   <div id="hint" class="hint" hidden></div>
   <div id="screen"></div>
