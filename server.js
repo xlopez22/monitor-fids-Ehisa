@@ -304,7 +304,7 @@ app.post('/api/scan', limiters.scan, h(async (req, res) => {
 }));
 
 // Importa el Excel de inventario subido desde el tablero
-app.post('/api/import', limiters.import, express.raw({ type: '*/*', limit: '20mb' }), h(async (req, res) => {
+app.post('/api/import', limiters.import, express.raw({ type: '*/*', limit: '5mb' }), h(async (req, res) => {
   if (!req.body?.length) throw new Error('Archivo vacío');
   const r = store.merge(await parseWorkbook(req.body));
   monitor.runOnce();
@@ -316,6 +316,22 @@ app.get('/thumb/:ip', (req, res) => {
   if (!t) return res.status(404).end();
   // El tablero pide /thumb/<ip>?t=<hora de captura>, así que cada URL es inmutable
   res.set('Cache-Control', 'private, max-age=3600').type('jpeg').send(t.jpeg);
+});
+
+// Errores de body-parser (tamaño/JSON) como JSON en vez de la página HTML de Express
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = err.status || err.statusCode || 500;
+  if (err.type === 'entity.too.large') {
+    const msg = req.path === '/api/import'
+      ? 'El archivo supera el máximo de 5 MB.'
+      : 'La petición supera el tamaño máximo permitido.';
+    return res.status(413).json({ error: msg });
+  }
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON inválido.' });
+  console.error(`[server] ${err.message}`);
+  return res.status(status >= 400 && status < 500 ? status : 500)
+    .json({ error: status >= 500 ? 'Error interno' : err.message });
 });
 
 const server = http.createServer(app);
