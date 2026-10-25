@@ -14,6 +14,7 @@ const { createAuth } = require('./lib/auth');
 const { isValidDataEncryptionKey } = require('./lib/password-enc');
 const { loadCa } = require('./lib/vnc-connect');
 const { ViewerControl } = require('./lib/viewer-control');
+const { createLimiters } = require('./lib/rate-limit');
 
 const port = Number(process.env.PORT) || 8080;
 const cfg = {
@@ -125,26 +126,28 @@ const viewers = new ViewerControl(); // conexiones de visor y su modo solo lectu
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', cfg.trustProxy ? 1 : false);
+const limiters = createLimiters();
 app.use(express.json({ limit: '64kb' }));
 app.use(auth.sessionParser);
 app.use(auth.originGuard);
 
 // Rutas públicas del login. El resto del panel queda detrás de requireAuth.
-app.post('/api/login', auth.loginLimiter, auth.login);
-app.post('/api/logout', auth.logout);
-app.get('/api/session', auth.sessionInfo);
+app.post('/api/login', limiters.publicApi, auth.loginLimiter, auth.login);
+app.post('/api/logout', limiters.publicApi, auth.logout);
+app.get('/api/session', limiters.publicApi, auth.sessionInfo);
 
 // Token CSRF para mutaciones (se renueva en login)
-app.get('/api/csrf-token', (req, res) => {
+app.get('/api/csrf-token', limiters.publicApi, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ token: req.session.csrf });
 });
 
 // Token de un solo uso para WebSocket (se pide desde view.html antes de conectar)
-app.get('/api/ws-token', auth.issueWsToken);
+app.get('/api/ws-token', limiters.publicApi, auth.issueWsToken);
 
 app.use(auth.requireAuth);
 app.use(auth.csrfGuard);
+app.use('/api', limiters.api);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/novnc', express.static(path.join(__dirname, 'node_modules', '@novnc', 'novnc')));
 
@@ -170,7 +173,7 @@ const h = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((e) => res.s
 
 // Permiso de control del visor: el WebSocket arranca en solo lectura y solo se
 // habilita la entrada tras este POST autenticado y con CSRF.
-app.post('/api/devices/:ip/control', h(async (req, res) => {
+app.post('/api/devices/:ip/control', limiters.control, h(async (req, res) => {
   const d = store.get(req.params.ip);
   if (!d) return res.status(404).json({ error: 'Equipo no encontrado' });
   const conn = String(req.body?.conn || '');
@@ -181,7 +184,7 @@ app.post('/api/devices/:ip/control', h(async (req, res) => {
   res.json({ control: true });
 }));
 
-app.post('/api/devices/:ip/release', h(async (req, res) => {
+app.post('/api/devices/:ip/release', limiters.control, h(async (req, res) => {
   const d = store.get(req.params.ip);
   if (!d) return res.status(404).json({ error: 'Equipo no encontrado' });
   const conn = String(req.body?.conn || '');
@@ -206,56 +209,56 @@ app.get('/api/config', (req, res) => {
 });
 
 // "Así se ve normal": guarda la pantalla actual como referencia del equipo
-app.post('/api/devices/:ip/baseline', h(async (req, res) => {
+app.post('/api/devices/:ip/baseline', limiters.mutation, h(async (req, res) => {
   store.setBaseline(req.params.ip, currentSig(req.params.ip).toString('base64'));
   res.json(view(store.get(req.params.ip)));
 }));
-app.delete('/api/devices/:ip/baseline', h(async (req, res) => {
+app.delete('/api/devices/:ip/baseline', limiters.mutation, h(async (req, res) => {
   store.setBaseline(req.params.ip, null);
   res.json(view(store.get(req.params.ip)));
 }));
 
 // "Esto es el escritorio de Windows": referencia global para detectar NG-Client no visible
-app.post('/api/desktop-refs', h(async (req, res) => {
+app.post('/api/desktop-refs', limiters.mutation, h(async (req, res) => {
   const color = dominantColor(currentSig(req.body.ip));
   store.addDesktopRef(req.body.ip, color);
   loadDesktopRefs();
   res.status(201).json({ color, count: store.settings.desktopRefs.length });
 }));
-app.delete('/api/desktop-refs', h(async (req, res) => {
+app.delete('/api/desktop-refs', limiters.mutation, h(async (req, res) => {
   store.clearDesktopRefs();
   loadDesktopRefs();
   res.status(204).end();
 }));
 
-app.post('/api/devices', h(async (req, res) => {
+app.post('/api/devices', limiters.mutation, h(async (req, res) => {
   const d = store.add(req.body);
   monitor.capture(d.ip); // primera captura sin esperar la ronda
   res.status(201).json(view(d));
 }));
 
-app.put('/api/devices/:ip', h(async (req, res) => {
+app.put('/api/devices/:ip', limiters.mutation, h(async (req, res) => {
   const d = store.update(req.params.ip, req.body);
   if (d.ip !== req.params.ip) monitor.forget(req.params.ip);
   await monitor.capture(d.ip); // por si cambió la contraseña o la IP
   res.json(view(d));
 }));
 
-app.delete('/api/devices/:ip', h(async (req, res) => {
+app.delete('/api/devices/:ip', limiters.mutation, h(async (req, res) => {
   store.remove(req.params.ip);
   monitor.forget(req.params.ip);
   res.status(204).end();
 }));
 
 // Vuelve a sacar la miniatura de un equipo
-app.post('/api/devices/:ip/refresh', h(async (req, res) => {
+app.post('/api/devices/:ip/refresh', limiters.refresh, h(async (req, res) => {
   if (!store.get(req.params.ip)) throw new Error('IP fuera del inventario');
   await monitor.capture(req.params.ip);
   res.json(view(store.get(req.params.ip)));
 }));
 
 // Lanza una ronda completa ya (no espera a que termine)
-app.post('/api/refresh-all', (req, res) => {
+app.post('/api/refresh-all', limiters.refreshAll, (req, res) => {
   monitor.runOnce();
   res.status(202).json({ running: true });
 });
@@ -265,7 +268,7 @@ app.get('/api/devices/:ip/proxy-error', (req, res) => {
 });
 
 // Busca equipos con VNC abierto que no estén en el inventario y prueba la contraseña general
-app.post('/api/scan', h(async (req, res) => {
+app.post('/api/scan', limiters.scan, h(async (req, res) => {
   const known = new Set(store.devices.map((d) => d.ip));
   const prefixes = req.body.prefix
     ? [String(req.body.prefix).trim()]
@@ -299,7 +302,7 @@ app.post('/api/scan', h(async (req, res) => {
 }));
 
 // Importa el Excel de inventario subido desde el tablero
-app.post('/api/import', express.raw({ type: '*/*', limit: '20mb' }), h(async (req, res) => {
+app.post('/api/import', limiters.import, express.raw({ type: '*/*', limit: '20mb' }), h(async (req, res) => {
   if (!req.body?.length) throw new Error('Archivo vacío');
   const r = store.merge(await parseWorkbook(req.body));
   monitor.runOnce();
@@ -321,7 +324,25 @@ const wss = new WebSocketServer({
   handleProtocols: (protocols) => (protocols.has('binary') ? 'binary' : false),
 });
 
+// El upgrade no pasa por Express: se responde 429 a mano y se cierra el socket.
+function rejectUpgrade(socket, status, message, retryAfterSec) {
+  if (socket.destroyed) return;
+  const body = JSON.stringify({ error: message });
+  const retry = retryAfterSec ? `Retry-After: ${retryAfterSec}\r\n` : '';
+  socket.write(
+    `HTTP/1.1 ${status} ${status === 429 ? 'Too Many Requests' : 'Bad Request'}\r\n` +
+    `${retry}Connection: close\r\nContent-Type: application/json\r\n` +
+    `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`,
+  );
+  socket.destroy();
+}
+
 server.on('upgrade', (req, socket, head) => {
+  // Límite por IP también para WebSocket: el upgrade no atraviesa Express.
+  const wsLimit = limiters.ws.take(req.socket.remoteAddress || 'desconocida');
+  if (!wsLimit.allowed) {
+    return rejectUpgrade(socket, 429, 'Demasiadas conexiones al visor. Espera un momento.', Math.max(1, Math.ceil(wsLimit.retryAfterMs / 1000)));
+  }
   // El upgrade no pasa por Express: se validan Host/Origin, la sesión y el token WS de un solo uso.
   if (!auth.isAllowedHost(req.headers.host) || !auth.isAllowedOrigin(req.headers.origin)) {
     return socket.destroy();
