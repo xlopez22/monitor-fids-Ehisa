@@ -1254,7 +1254,7 @@ a.name:hover { color: var(--brand-600); }
    celda larga desplazaba las columnas de las demás tablas. */
 table.list {
   width: 100%;
-  min-width: 1080px;
+  min-width: 1020px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -1270,16 +1270,14 @@ table.list th {
   text-transform: uppercase;
   white-space: nowrap;
 }
-table.list th:nth-child(1) { width: 10.4%; }
-table.list th:nth-child(2) { width: 7.6%; }
-table.list th:nth-child(3) { width: 10%; }
-table.list th:nth-child(4) { width: 11.2%; }
-table.list th:nth-child(5) { width: 9.5%; }
-table.list th:nth-child(6) { width: 7.8%; }
-table.list th:nth-child(7) { width: 7.3%; }
-table.list th:nth-child(8) { width: 7.4%; }
-table.list th:nth-child(9) { width: 8.1%; }
-table.list th:nth-child(10) { width: 20.7%; }
+table.list th:nth-child(1) { width: 11.1%; }
+table.list th:nth-child(2) { width: 8.5%; }
+table.list th:nth-child(3) { width: 16%; }
+table.list th:nth-child(4) { width: 14%; }
+table.list th:nth-child(5) { width: 10.5%; }
+table.list th:nth-child(6) { width: 9%; }
+table.list th:nth-child(7) { width: 8.5%; }
+table.list th:nth-child(8) { width: 22.4%; }
 table.list td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
@@ -1317,7 +1315,6 @@ table.list td.ip {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-table.list td.err { max-width: 260px; }
 /* Un <td> con display:flex deja de ocupar el alto de la fila y rompe la línea
    inferior de la tabla; la celda vuelve a ser table-cell y alinea su contenido. */
 table.list td.btns {
@@ -1772,14 +1769,12 @@ fieldset.refs legend { padding: 0 5px; color: var(--muted); font-size: 11px; fon
   table.list th:nth-child(6),
   table.list td:nth-child(7),
   table.list th:nth-child(7) { display: none; }
-  table.list { min-width: 940px; }
-  table.list th:nth-child(1) { width: 12%; }
-  table.list th:nth-child(2) { width: 9%; }
-  table.list th:nth-child(3) { width: 20.5%; }
-  table.list th:nth-child(5) { width: 11%; }
-  table.list th:nth-child(8) { width: 9%; }
-  table.list th:nth-child(9) { width: 10%; }
-  table.list th:nth-child(10) { width: 28.5%; }
+  table.list { min-width: 820px; }
+  table.list th:nth-child(1) { width: 14%; }
+  table.list th:nth-child(2) { width: 10.5%; }
+  table.list th:nth-child(3) { width: 34%; }
+  table.list th:nth-child(5) { width: 13%; }
+  table.list th:nth-child(8) { width: 28.5%; }
 }
 
 @media (max-width: 620px) {

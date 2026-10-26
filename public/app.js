@@ -291,8 +291,6 @@ function rowHtml(d) {
       <td class="ip">${esc(d.ip)}</td>
       <td>${esc(d.resolution || '')}</td>
       <td>${d.thumbAt ? `<span data-ts="${d.thumbAt}"></span>` : ''}</td>
-      <td>${healthHtml(d)}</td>
-      <td class="err">${d.status?.online && d.thumbError ? esc(d.thumbError) : ''}</td>
       <td class="btns">${actionBtns(d)}</td>
     </tr>`;
 }
@@ -324,7 +322,7 @@ function render() {
       const items = g.items.map((d) => { const h = item(d); lastHtml.set(d.ip, h); return h; }).join('');
       return state.view === 'grid'
         ? `<div class="grid">${items}</div>`
-        : `<div class="tableWrap"><table class="list"><thead><tr><th></th><th>Estado</th><th>Nombre</th><th>Ubicación</th><th>IP</th><th>Resolución</th><th>Captura</th><th>Pantalla</th><th>Error</th><th></th></tr></thead><tbody>${items}</tbody></table></div>`;
+        : `<div class="tableWrap"><table class="list"><thead><tr><th></th><th>Estado</th><th>Nombre</th><th>Ubicación</th><th>IP</th><th>Resolución</th><th>Captura</th><th></th></tr></thead><tbody>${items}</tbody></table></div>`;
     };
     $('#groups').innerHTML = list.length
       ? [...groups.values()].map((g) => `<section class="group"><div class="groupHead"><h2 data-group="${esc(g.key)}">${groupHeader(g)}</h2></div>${body(g)}</section>`).join('')
