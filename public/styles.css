@@ -1250,9 +1250,16 @@ a.name:hover { color: var(--brand-600); }
   background: var(--panel);
   box-shadow: var(--shadow-xs);
 }
-table.list { width: 100%; min-width: 940px; border-collapse: collapse; }
+/* Columnas fijas: cada grupo es una tabla distinta y, sin esto, el ancho de una
+   celda larga desplazaba las columnas de las demás tablas. */
+table.list {
+  width: 100%;
+  min-width: 1080px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
 table.list th {
-  padding: 10px 14px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--gray-50);
   color: var(--muted);
@@ -1263,10 +1270,20 @@ table.list th {
   text-transform: uppercase;
   white-space: nowrap;
 }
+table.list th:nth-child(1) { width: 10.4%; }
+table.list th:nth-child(2) { width: 7.6%; }
+table.list th:nth-child(3) { width: 10%; }
+table.list th:nth-child(4) { width: 11.2%; }
+table.list th:nth-child(5) { width: 9.5%; }
+table.list th:nth-child(6) { width: 7.8%; }
+table.list th:nth-child(7) { width: 7.3%; }
+table.list th:nth-child(8) { width: 7.4%; }
+table.list th:nth-child(9) { width: 8.1%; }
+table.list th:nth-child(10) { width: 20.7%; }
 table.list td {
-  padding: 10px 14px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
-  font-size: 12.5px;
+  font-size: 12px;
   vertical-align: middle;
 }
 table.list tr:last-child td { border-bottom: 0; }
@@ -1276,7 +1293,7 @@ table.list td.st,
 table.list td.ip,
 table.list td:nth-child(6),
 table.list td:nth-child(7) { white-space: nowrap; }
-table.list td.mini { width: 104px; padding: 7px 10px; }
+table.list td.mini { padding: 7px 10px; }
 table.list td.mini .miniBox,
 table.list td.mini a {
   display: block;
@@ -1292,11 +1309,11 @@ table.list td.desc { max-width: 320px; white-space: normal; }
    texto, sin la píldora de fondo ni el margen automático. */
 table.list td.ip {
   margin: 0;
-  padding: 10px 14px;
+  padding: 10px 12px;
   border-radius: 0;
   background: none;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1305,11 +1322,16 @@ table.list td.err { max-width: 260px; }
    inferior de la tabla; la celda vuelve a ser table-cell y alinea su contenido. */
 table.list td.btns {
   display: table-cell;
+  /* Sin espacio entre nodos: el enlace de reintento y los dos iconos deben caber
+     en una sola línea dentro del ancho fijo de la columna. */
+  font-size: 0;
   white-space: nowrap;
   text-align: right;
 }
 table.list td.btns > * { vertical-align: middle; }
-table.list td.btns > * + * { margin-left: 4px; }
+table.list td.btns > * + * { margin-left: 3px; }
+/* El enlace completo es más ancho que la columna; se compacta solo en la tabla. */
+table.list .retryLink { padding: 0 6px; font-size: 10.5px; }
 
 /* ---------- diálogos ---------- */
 dialog {
@@ -1750,6 +1772,14 @@ fieldset.refs legend { padding: 0 5px; color: var(--muted); font-size: 11px; fon
   table.list th:nth-child(6),
   table.list td:nth-child(7),
   table.list th:nth-child(7) { display: none; }
+  table.list { min-width: 940px; }
+  table.list th:nth-child(1) { width: 12%; }
+  table.list th:nth-child(2) { width: 9%; }
+  table.list th:nth-child(3) { width: 20.5%; }
+  table.list th:nth-child(5) { width: 11%; }
+  table.list th:nth-child(8) { width: 9%; }
+  table.list th:nth-child(9) { width: 10%; }
+  table.list th:nth-child(10) { width: 28.5%; }
 }
 
 @media (max-width: 620px) {
