@@ -20,14 +20,68 @@
   font-display: swap;
 }
 
+/* El visor sigue el mismo tema que el panel: claro por defecto y oscuro cuando
+   el usuario lo elige. La pantalla remota siempre se pinta en negro. */
 :root {
+  color-scheme: light;
+  --bar: #ffffff;
+  --bar-2: #f7f9fc;
+  --bar-border: rgba(1, 100, 255, .16);
+  --bar-shadow: 0 4px 14px rgba(16, 24, 40, .07);
+  --surface: rgba(16, 24, 40, .045);
+  --surface-hover: rgba(16, 24, 40, .07);
+  --surface-strong: rgba(16, 24, 40, .1);
+  --text: #101828;
+  --strong-text: #101828;
+  --label-text: #344054;
+  --muted: #667085;
+  --border: #e4e7ec;
+  --border-strong: #d0d5dd;
+  --ok: #039855;
+  --bad: #d92d20;
+  --warn: #b54708;
+  --accent: #0164ff;
+  --accent-2: #004fd4;
+  --focus: #2a6aff;
+  --back-text: #344054;
+  --popover-bg: #ffffff;
+  --popover-border: #e4e7ec;
+  --popover-shadow: 0 24px 60px -18px rgba(16, 24, 40, .22), 0 0 0 1px rgba(16, 24, 40, .03);
+  --output-bg: #f2f4f7;
+  --field-bg: #ffffff;
+  --key-bg: #fcfcfd;
+  --key-text: #344054;
+  --key-divider: #f2f4f7;
+  --fast-bg: #fffaeb;
+  --fast-border: #fedf89;
+  --fast-hover-bg: #fef0c7;
+  --fast-hover-text: #93370d;
+  --fullscreen-bg: #eff6ff;
+  --fullscreen-border: #c7d7fe;
+  --fullscreen-text: #004fd4;
+  --hint-bg: #eff6ff;
+  --hint-border: #c7d7fe;
+  --hint-text: #003baa;
+  --hint-warn-bg: #fffaeb;
+  --hint-warn-border: #fedf89;
+  --hint-warn-text: #93370d;
+  --down-bg: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+  --down-shadow: 0 24px 60px -18px rgba(16, 24, 40, .28);
+  --font: "Gotham Rounded", "Gotham", "Montserrat", "Outfit", "Inter", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+.dark {
   color-scheme: dark;
   --bar: #161d36;
   --bar-2: #0f152a;
+  --bar-border: rgba(42, 106, 255, .34);
+  --bar-shadow: 0 5px 20px rgba(0, 0, 0, .3);
   --surface: rgba(255, 255, 255, .06);
   --surface-hover: rgba(255, 255, 255, .1);
   --surface-strong: rgba(255, 255, 255, .14);
   --text: #f2f4f7;
+  --strong-text: #ffffff;
+  --label-text: #dbe3f4;
   --muted: #98a2b3;
   --border: rgba(255, 255, 255, .12);
   --border-strong: rgba(255, 255, 255, .22);
@@ -36,8 +90,31 @@
   --warn: #fec84b;
   --accent: #2a6aff;
   --accent-2: #004fd4;
-  --font: "Gotham Rounded", "Gotham", "Montserrat", "Outfit", "Inter", -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --focus: #5589ff;
+  --back-text: #d4dff8;
+  --popover-bg: linear-gradient(180deg, #1c2542 0%, #141a30 100%);
+  --popover-border: rgba(255, 255, 255, .15);
+  --popover-shadow: 0 24px 60px -16px rgba(0, 0, 0, .82), 0 0 0 1px rgba(0, 0, 0, .25);
+  --output-bg: rgba(255, 255, 255, .09);
+  --field-bg: #10162b;
+  --key-bg: rgba(255, 255, 255, .045);
+  --key-text: #e7ecf8;
+  --key-divider: rgba(255, 255, 255, .07);
+  --fast-bg: rgba(247, 144, 9, .15);
+  --fast-border: rgba(247, 144, 9, .3);
+  --fast-hover-bg: rgba(247, 144, 9, .22);
+  --fast-hover-text: #ffe6a8;
+  --fullscreen-bg: rgba(42, 106, 255, .18);
+  --fullscreen-border: rgba(42, 106, 255, .35);
+  --fullscreen-text: #dbe7ff;
+  --hint-bg: rgba(1, 100, 255, .14);
+  --hint-border: rgba(42, 106, 255, .25);
+  --hint-text: #dbe7ff;
+  --hint-warn-bg: rgba(181, 71, 8, .32);
+  --hint-warn-border: rgba(247, 144, 9, .3);
+  --hint-warn-text: #fef0c7;
+  --down-bg: linear-gradient(180deg, rgba(30, 36, 68, .98), rgba(24, 32, 60, .98));
+  --down-shadow: 0 24px 60px -18px rgba(0, 0, 0, .7);
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -57,7 +134,7 @@ body {
 }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
-:focus-visible { outline: 2px solid #5589ff; outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 :focus:not(:focus-visible) { outline: none; }
 
 /* ---------- Barra superior ---------- */
@@ -70,9 +147,9 @@ button { cursor: pointer; }
   gap: 14px;
   min-height: 62px;
   padding: 9px 14px;
-  border-bottom: 1px solid rgba(42, 106, 255, .34);
+  border-bottom: 1px solid var(--bar-border);
   background: linear-gradient(180deg, var(--bar) 0%, var(--bar-2) 100%);
-  box-shadow: 0 5px 20px rgba(0, 0, 0, .3);
+  box-shadow: var(--bar-shadow);
 }
 .barLead {
   display: flex;
@@ -82,6 +159,9 @@ button { cursor: pointer; }
   min-width: 0;
 }
 .brandMark { width: 25px; height: 25px; flex: none; object-fit: contain; }
+.brandMark.logoDark { display: none; }
+.dark .brandMark.logoLight { display: none; }
+.dark .brandMark.logoDark { display: block; }
 .barDivider { width: 1px; height: 26px; flex: none; background: var(--border); }
 .barTitle { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .barTitle b {
@@ -159,20 +239,20 @@ button { cursor: pointer; }
 .toolBtn[aria-expanded="true"] {
   border-color: var(--border);
   background: var(--surface-strong);
-  color: #fff;
+  color: var(--text);
 }
-.backBtn { color: #d4dff8; }
+.backBtn { color: var(--back-text); }
 .backBtn svg { width: 17px; height: 17px; }
 #fast.active {
-  border-color: rgba(247, 144, 9, .3);
-  background: rgba(247, 144, 9, .15);
+  border-color: var(--fast-border);
+  background: var(--fast-bg);
   color: var(--warn);
 }
-#fast.active:hover:not(:disabled) { background: rgba(247, 144, 9, .22); color: #ffe6a8; }
+#fast.active:hover:not(:disabled) { background: var(--fast-hover-bg); color: var(--fast-hover-text); }
 #fullscreen.active {
-  border-color: rgba(42, 106, 255, .35);
-  background: rgba(42, 106, 255, .18);
-  color: #dbe7ff;
+  border-color: var(--fullscreen-border);
+  background: var(--fullscreen-bg);
+  color: var(--fullscreen-text);
 }
 .controlBtn {
   display: inline-flex;
@@ -218,6 +298,11 @@ button { cursor: pointer; }
   50% { box-shadow: 0 0 0 6px rgba(255, 255, 255, .04); }
 }
 
+/* Iconos de tema: luna en claro (para pasar a oscuro) y sol en oscuro. */
+.themeIconSun { display: none; }
+.dark .themeIconSun { display: block; }
+.dark .themeIconMoon { display: none; }
+
 /* ---------- Paneles desplegables ---------- */
 .popover {
   position: absolute;
@@ -228,10 +313,10 @@ button { cursor: pointer; }
   max-height: calc(100vh - 90px);
   padding: 15px;
   overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, .15);
+  border: 1px solid var(--popover-border);
   border-radius: 14px;
-  background: linear-gradient(180deg, #1c2542 0%, #141a30 100%);
-  box-shadow: 0 24px 60px -16px rgba(0, 0, 0, .82), 0 0 0 1px rgba(0, 0, 0, .25);
+  background: var(--popover-bg);
+  box-shadow: var(--popover-shadow);
   animation: popIn .14s ease-out both;
 }
 .keyboardPopover { width: min(430px, calc(100vw - 24px)); }
@@ -248,7 +333,7 @@ button { cursor: pointer; }
   padding-bottom: 11px;
   border-bottom: 1px solid var(--border);
 }
-.popHead strong { display: block; color: #fff; font-size: 13.5px; font-weight: 700; }
+.popHead strong { display: block; color: var(--strong-text); font-size: 13.5px; font-weight: 700; }
 .popHead span { display: block; margin-top: 2px; color: var(--muted); font-size: 10.5px; }
 .popClose {
   display: inline-flex;
@@ -264,7 +349,7 @@ button { cursor: pointer; }
   color: var(--muted);
   box-shadow: none;
 }
-.popClose:hover { background: var(--surface-hover); color: #fff; }
+.popClose:hover { background: var(--surface-hover); color: var(--text); }
 .popClose svg {
   width: 15px;
   height: 15px;
@@ -275,14 +360,14 @@ button { cursor: pointer; }
 }
 
 .settingRow + .settingRow { margin-top: 14px; }
-.settingRow label { color: #dbe3f4; font-size: 11.5px; font-weight: 600; }
+.settingRow label { color: var(--label-text); font-size: 11.5px; font-weight: 600; }
 .settingTop { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .settingTop output {
   min-width: 26px;
   padding: 1px 7px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, .09);
-  color: #fff;
+  background: var(--output-bg);
+  color: var(--strong-text);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -304,7 +389,7 @@ button { cursor: pointer; }
   padding: 0 9px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #10162b;
+  background: var(--field-bg);
   color: var(--text);
   font-size: 11px;
   cursor: pointer;
@@ -321,7 +406,7 @@ button { cursor: pointer; }
 .keyGroup + .keyGroup {
   margin-top: 13px;
   padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, .07);
+  border-top: 1px solid var(--key-divider);
 }
 .popSection {
   margin: 0 0 7px;
@@ -342,8 +427,8 @@ button { cursor: pointer; }
   padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, .045);
-  color: #e7ecf8;
+  background: var(--key-bg);
+  color: var(--key-text);
   font-size: 10.5px;
   font-weight: 600;
   line-height: 1.15;
@@ -354,10 +439,11 @@ button { cursor: pointer; }
 .keyBtn:hover:not(:disabled) {
   border-color: var(--border-strong);
   background: var(--surface-hover);
-  color: #fff;
+  color: var(--text);
 }
 .keyBtn:active:not(:disabled) { transform: translateY(1px); }
 .keyBtn:disabled { opacity: .5; cursor: not-allowed; }
+.keyBtn.wide { grid-column: 1 / -1; }
 .keyBtn.held,
 .keyBtn.active {
   border-color: transparent;
@@ -371,16 +457,16 @@ button { cursor: pointer; }
 .hint {
   flex: none;
   padding: 7px 14px;
-  border-bottom: 1px solid rgba(42, 106, 255, .25);
-  background: rgba(1, 100, 255, .14);
-  color: #dbe7ff;
+  border-bottom: 1px solid var(--hint-border);
+  background: var(--hint-bg);
+  color: var(--hint-text);
   font-size: 11.5px;
   line-height: 1.4;
 }
 .hint.warn {
-  border-bottom-color: rgba(247, 144, 9, .3);
-  background: rgba(181, 71, 8, .32);
-  color: #fef0c7;
+  border-bottom-color: var(--hint-warn-border);
+  background: var(--hint-warn-bg);
+  color: var(--hint-warn-text);
 }
 #screen { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #000; }
 #screen canvas { display: block; outline: none; }
@@ -393,8 +479,8 @@ button { cursor: pointer; }
   padding: 24px 26px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(30, 36, 68, .98), rgba(24, 32, 60, .98));
-  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, .7);
+  background: var(--down-bg);
+  box-shadow: var(--down-shadow);
   text-align: center;
 }
 .down h2 { margin: 0; color: var(--bad); font-size: 17px; }
@@ -442,7 +528,12 @@ html.pointer-huge #screen canvas { cursor: url("data:image/svg+xml,%3Csvg%20xmln
   }
 }
 @media (max-width: 430px) {
+  .barActions { gap: 1px; }
+  .barActions .toolBtn { min-height: 34px; }
+  .barActions .toolBtn.iconOnly { width: 34px; }
+  /* El botón de reconectar no cabe en la barra: su acción queda en Teclado > Conexión. */
+  #reconnect { display: none; }
   .actionsDivider { margin: 0 2px; }
-  .controlBtn { margin-left: 2px; padding: 0 11px; font-size: 11.5px; }
+  .controlBtn { margin-left: 2px; padding: 0 10px; font-size: 11px; gap: 6px; }
   .keyGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

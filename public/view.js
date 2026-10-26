@@ -6,6 +6,16 @@ const params = new URLSearchParams(location.search);
 const ip = params.get('ip');
 const force = params.get('force') === '1';
 
+// La barra del navegador (móvil) acompaña el tema claro/oscuro del visor.
+function syncThemeColor() {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) return;
+  const bar = getComputedStyle(document.documentElement).getPropertyValue('--bar').trim();
+  meta.setAttribute('content', bar || '#ffffff');
+}
+syncThemeColor();
+window.addEventListener('fids:theme', syncThemeColor);
+
 // Texto del inventario antes de insertarlo como HTML (nombres pueden venir de un Excel)
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -530,7 +540,9 @@ function syncFullscreen() {
 }
 document.addEventListener('fullscreenchange', syncFullscreen);
 syncFullscreen();
-$('#reconnect').addEventListener('click', () => connect());
+for (const btn of $$('[data-reconnect]')) {
+  btn.addEventListener('click', () => { closePanels(); connect(); });
+}
 
 window.addEventListener('beforeunload', releaseAll);
 init();
