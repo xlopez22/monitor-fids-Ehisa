@@ -383,7 +383,7 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 72px;
+  min-height: 74px;
   padding: 0 18px;
   border-bottom: 1px solid var(--sidebar-border);
 }
@@ -391,7 +391,7 @@ input[type="checkbox"] {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
   color: var(--text);
   text-decoration: none;
@@ -403,6 +403,9 @@ input[type="checkbox"] {
   max-width: 100%;
   object-fit: contain;
 }
+.sidebarBrand .brandFull.logoDark { display: none; }
+.dark .sidebarBrand .brandFull.logoLight { display: none; }
+.dark .sidebarBrand .brandFull.logoDark { display: block; }
 .sidebarBrand .brandMark {
   display: none;
   width: 38px;
@@ -788,13 +791,40 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
   min-height: 76px;
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--panel);
+  color: var(--text);
+  font-weight: 400;
+  text-align: left;
+  box-shadow: var(--shadow-xs);
+  transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease,
+    transform .16s ease;
+}
+.stats .kpi:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--brand-500) 42%, var(--border));
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+.stats .kpi:active:not(:disabled) {
+  transform: translateY(0);
   box-shadow: var(--shadow-xs);
 }
+.stats .kpi:focus-visible {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: var(--focus-ring);
+}
+.stats .kpi.isActive {
+  border-color: var(--brand-500);
+  background: color-mix(in srgb, var(--brand-500) 5%, var(--panel));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-500) 14%, transparent);
+}
+.stats .kpi.isActive .kpiLabel { color: var(--brand-600); }
 .kpiIcon {
   display: grid;
   place-items: center;
@@ -817,7 +847,7 @@ input[type="checkbox"] {
 .kpiIcon.offline { background: var(--error-50); color: var(--error-600); }
 .kpiIcon.error { background: var(--warning-50); color: var(--warning-600); }
 .kpiIcon.review { background: var(--purple-50); color: var(--purple-600); }
-.kpiBody { min-width: 0; }
+.kpiBody { flex: 1; min-width: 0; }
 .kpiLabel {
   display: block;
   overflow: hidden;
@@ -1588,6 +1618,10 @@ fieldset.refs legend { padding: 0 5px; color: var(--muted); font-size: 11px; fon
 .dark .kpiIcon.offline { background: color-mix(in srgb, var(--error-500) 16%, transparent); color: var(--error-300); }
 .dark .kpiIcon.error { background: color-mix(in srgb, var(--warning-500) 16%, transparent); color: var(--warning-300); }
 .dark .kpiIcon.review { background: color-mix(in srgb, var(--purple-500) 18%, transparent); color: var(--purple-300); }
+.dark .stats .kpi.isActive {
+  background: color-mix(in srgb, var(--brand-500) 13%, var(--panel));
+}
+.dark .stats .kpi.isActive .kpiLabel { color: var(--brand-300); }
 .dark .pill.online { background: color-mix(in srgb, var(--success-500) 16%, transparent); color: var(--success-300); }
 .dark .pill.error { background: color-mix(in srgb, var(--warning-500) 16%, transparent); color: var(--warning-300); }
 .dark .pill.offline { background: color-mix(in srgb, var(--error-500) 16%, transparent); color: var(--error-300); }

@@ -49,11 +49,37 @@ const ICONS = {
 };
 const STATUS_LABEL = { online: 'En línea', error: 'Con error', offline: 'Caído', pending: 'Revisando' };
 
-function kpiHtml(kind, label, value) {
-  return `<div class="kpi">
-    <span class="kpiIcon ${kind}">${ICONS[kind]}</span>
-    <div class="kpiBody"><span class="kpiLabel">${label}</span><strong class="kpiValue">${value}</strong></div>
-  </div>`;
+// El resumen también filtra: cada tarjeta equivale a un estado del panel.
+const SUMMARY_ITEMS = [
+  { key: 'total', filter: 'all', label: 'Total equipos' },
+  { key: 'online', filter: 'online', label: 'En línea' },
+  { key: 'offline', filter: 'offline', label: 'Caídos' },
+  { key: 'error', filter: 'error', label: 'Con error' },
+  { key: 'review', filter: 'review', label: 'A revisar' },
+];
+
+function kpiHtml(item, value) {
+  return `<button type="button" class="kpi" data-kpi="${item.filter}" aria-pressed="false" title="Filtrar: ${item.label}">
+    <span class="kpiIcon ${item.key}">${ICONS[item.key]}</span>
+    <span class="kpiBody"><span class="kpiLabel">${item.label}</span><strong class="kpiValue">${value}</strong></span>
+  </button>`;
+}
+
+// Se actualiza en sitio para no perder el foco del botón mientras llegan refrescos.
+function renderSummary(counts) {
+  const box = $('#summary');
+  if (!box.querySelector('.kpi[data-kpi]')) {
+    box.innerHTML = SUMMARY_ITEMS.map((item) => kpiHtml(item, counts[item.key])).join('');
+  }
+  for (const btn of $$('#summary .kpi[data-kpi]')) {
+    const item = SUMMARY_ITEMS.find((i) => i.filter === btn.dataset.kpi);
+    if (!item) continue;
+    const value = btn.querySelector('.kpiValue');
+    if (value && value.textContent !== String(counts[item.key])) value.textContent = counts[item.key];
+    const on = state.filter.status === item.filter;
+    btn.classList.toggle('isActive', on);
+    btn.setAttribute('aria-pressed', String(on));
+  }
 }
 
 let toastTimer;
@@ -335,13 +361,7 @@ function render() {
   }
   const navTotal = $('#navTotal');
   if (navTotal) navTotal.textContent = all.length;
-  $('#summary').innerHTML = [
-    kpiHtml('total', 'Total equipos', all.length),
-    kpiHtml('online', 'En línea', counts.online),
-    kpiHtml('offline', 'Caídos', counts.offline),
-    kpiHtml('error', 'Con error', counts.error),
-    kpiHtml('review', 'A revisar', review),
-  ].join('');
+  renderSummary(counts);
   const round = $('#roundState');
   if (round) round.hidden = !state.roundRunning;
 }
@@ -562,9 +582,31 @@ $('#refreshAll').addEventListener('click', async () => {
 $('#search').addEventListener('input', (e) => { state.filter.q = e.target.value.trim().toLowerCase(); render(); });
 $('#group').addEventListener('change', (e) => { state.filter.group = e.target.value; savePrefs(); render(); closeSidebarMobile(); });
 
+function syncSeg(id, value) {
+  for (const b of $$(`${id} button`)) {
+    const on = b.dataset.v === value;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  }
+}
+
+function setStatusFilter(value) {
+  state.filter.status = value;
+  syncSeg('#statusSeg', state.filter.status);
+  savePrefs();
+  render();
+  closeSidebarMobile();
+}
+
+$('#summary').addEventListener('click', (e) => {
+  const kpi = e.target.closest('.kpi[data-kpi]');
+  if (!kpi) return;
+  setStatusFilter(kpi.dataset.kpi);
+});
+
 function bindSeg(id, get, set) {
   const seg = $(id);
-  const sync = () => $$('button', seg).forEach((b) => b.classList.toggle('on', b.dataset.v === get()));
+  const sync = () => syncSeg(id, get());
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
