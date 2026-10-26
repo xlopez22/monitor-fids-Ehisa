@@ -1288,9 +1288,28 @@ table.list td.mini a {
 }
 table.list td.mini img { display: block; width: 100%; height: 100%; object-fit: contain; }
 table.list td.desc { max-width: 320px; white-space: normal; }
-table.list td.ip { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* La clase .ip también existe en las tarjetas: dentro de la tabla debe ser solo
+   texto, sin la píldora de fondo ni el margen automático. */
+table.list td.ip {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 table.list td.err { max-width: 260px; }
-table.list .btns { justify-content: flex-end; }
+/* Un <td> con display:flex deja de ocupar el alto de la fila y rompe la línea
+   inferior de la tabla; la celda vuelve a ser table-cell y alinea su contenido. */
+table.list td.btns {
+  display: table-cell;
+  white-space: nowrap;
+  text-align: right;
+}
+table.list td.btns > * { vertical-align: middle; }
+table.list td.btns > * + * { margin-left: 4px; }
 
 /* ---------- diálogos ---------- */
 dialog {
