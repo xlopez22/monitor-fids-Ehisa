@@ -359,8 +359,6 @@ function render() {
     const el = $(`#statusSeg [data-count="${key}"]`);
     if (el) el.textContent = value;
   }
-  const navTotal = $('#navTotal');
-  if (navTotal) navTotal.textContent = all.length;
   renderSummary(counts);
   const round = $('#roundState');
   if (round) round.hidden = !state.roundRunning;

@@ -112,8 +112,6 @@
   --sidebar-text: var(--gray-700);
   --sidebar-muted: var(--gray-500);
   --sidebar-hover: var(--gray-100);
-  --sidebar-active-bg: var(--brand-50);
-  --sidebar-active-text: var(--brand-600);
 
   --shadow-xs: 0 1px 2px rgba(16, 24, 40, .05);
   --shadow-sm: 0 1px 3px rgba(16, 24, 40, .1), 0 1px 2px rgba(16, 24, 40, .06);
@@ -143,8 +141,6 @@
   --sidebar-text: #d0d5dd;
   --sidebar-muted: #98a2b3;
   --sidebar-hover: rgba(255, 255, 255, .05);
-  --sidebar-active-bg: rgba(1, 100, 255, .14);
-  --sidebar-active-text: #8aafff;
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, .35);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, .4), 0 1px 2px rgba(0, 0, 0, .3);
   --shadow-md: 0 4px 10px -2px rgba(0, 0, 0, .45), 0 2px 4px -2px rgba(0, 0, 0, .35);
@@ -456,7 +452,6 @@ input[type="checkbox"] {
   white-space: nowrap;
 }
 .sidebarBody > .sidebarLabel:first-child { margin-top: 4px; }
-.sidebarNav,
 .navList,
 .sidebarActions { display: flex; flex-direction: column; gap: 3px; }
 
@@ -507,12 +502,38 @@ input[type="checkbox"] {
 .sideAction:hover svg { color: var(--sidebar-text); }
 .navItem.on,
 .navItem.isActive {
-  background: var(--sidebar-active-bg);
-  color: var(--sidebar-active-text);
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text);
   font-weight: 600;
 }
-.navItem.on svg,
-.navItem.isActive svg { color: var(--sidebar-active-text); }
+/* El filtro activo se marca con una barra fina: sin llenar todo el menú de azul. */
+#statusSeg .navItem.on {
+  background: var(--sidebar-hover);
+  color: var(--text);
+}
+#statusSeg .navItem.on::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 3px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--brand-500);
+  transform: translateY(-50%);
+}
+#statusSeg .navItem.on svg { color: var(--brand-600); }
+#viewSeg .navItem.on { color: var(--text); }
+#viewSeg .navItem.on svg { color: var(--sidebar-text); }
+#viewSeg .navItem.on::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: none;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--brand-500);
+}
 .navText,
 .actText {
   flex: 1;
@@ -534,10 +555,9 @@ input[type="checkbox"] {
   text-align: center;
   transition: background-color .16s ease, color .16s ease;
 }
-.navItem.on .navBadge,
-.navItem.isActive .navBadge {
+#statusSeg .navItem.on .navBadge {
   background: color-mix(in srgb, var(--brand-500) 13%, transparent);
-  color: var(--sidebar-active-text);
+  color: var(--brand-700);
 }
 .sidebarField { padding: 0 2px; }
 .sidebarField select {
@@ -618,6 +638,10 @@ input[type="checkbox"] {
 .appShell.sidebar-collapsed:not(.sidebar-hover) .sideAction {
   justify-content: center;
   padding: 0;
+}
+.appShell.sidebar-collapsed:not(.sidebar-hover) #statusSeg .navItem.on::before,
+.appShell.sidebar-collapsed:not(.sidebar-hover) #viewSeg .navItem.on::after {
+  display: none;
 }
 .appShell.sidebar-collapsed:not(.sidebar-hover) .sidebarLabel {
   height: 12px;
@@ -1630,10 +1654,11 @@ fieldset.refs legend { padding: 0 5px; color: var(--muted); font-size: 11px; fon
 .dark .hb.info { background: var(--panel-2); color: var(--muted); }
 .dark .badge,
 .dark .navBadge { background: var(--panel-2); color: var(--muted); }
-.dark .navItem.on .navBadge,
-.dark .navItem.isActive .navBadge {
+.dark #statusSeg .navItem.on svg { color: var(--brand-300); }
+.dark #viewSeg .navItem.on::after { background: var(--brand-300); }
+.dark #statusSeg .navItem.on .navBadge {
   background: color-mix(in srgb, var(--brand-500) 24%, transparent);
-  color: var(--sidebar-active-text);
+  color: var(--brand-300);
 }
 .dark .btnGhost:hover:not(:disabled),
 .dark .btnSubtle:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }

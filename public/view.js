@@ -1,6 +1,7 @@
 import RFB from '/novnc/core/rfb.js';
 
 const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
 const params = new URLSearchParams(location.search);
 const ip = params.get('ip');
 const force = params.get('force') === '1';
@@ -76,6 +77,47 @@ function setStatus(text, cls = '') {
   $('#status').className = `status ${cls}`;
 }
 
+// La etiqueta vive en un <span> para conservar el LED y los iconos del botón.
+function setControlLabel(btn, text) {
+  const label = btn.querySelector('.controlLabel');
+  if (label) label.textContent = text;
+  else btn.textContent = text;
+}
+
+function setControlActive(btn, active) {
+  btn.classList.toggle('active', active);
+  btn.setAttribute('aria-pressed', String(active));
+}
+
+// ---------- Ajustes y teclado en paneles, al estilo de una barra de escritorio ----------
+function closePanels(except = null) {
+  for (const panel of $$('.popover')) {
+    const open = panel === except;
+    panel.hidden = !open;
+    const trigger = document.querySelector(`[data-panel="${panel.id}"]`);
+    if (trigger) trigger.setAttribute('aria-expanded', String(open));
+  }
+}
+for (const trigger of $$('[data-panel]')) {
+  trigger.addEventListener('click', () => {
+    const panel = document.getElementById(trigger.dataset.panel);
+    if (!panel) return;
+    closePanels(panel.hidden ? panel : null);
+  });
+}
+for (const btn of $$('[data-close-panel]')) {
+  btn.addEventListener('click', () => closePanels());
+}
+document.addEventListener('pointerdown', (e) => {
+  if (!e.target.closest?.('.popover') && !e.target.closest?.('[data-panel]')) closePanels();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $$('.popover:not([hidden])').length) {
+    e.stopPropagation();
+    closePanels();
+  }
+}, true);
+
 async function connect() {
   if (rfb) rfb.disconnect();
   $('#screen').innerHTML = '';
@@ -87,9 +129,10 @@ async function connect() {
   controlling = false;
   setFast(false);
   const controlBtn = $('#control');
-  controlBtn.classList.remove('active');
-  controlBtn.textContent = 'Tomar control';
+  setControlActive(controlBtn, false);
+  setControlLabel(controlBtn, 'Tomar control');
   controlBtn.disabled = false;
+  closePanels();
   // Pedir token de un solo uso para WebSocket
   let wsToken = '';
   try {
@@ -133,8 +176,8 @@ async function connect() {
     controlling = false;
     if (navigator.keyboard?.unlock) navigator.keyboard.unlock();
     setFast(false);
-    controlBtn.classList.remove('active');
-    controlBtn.textContent = 'Tomar control';
+    setControlActive(controlBtn, false);
+    setControlLabel(controlBtn, 'Tomar control');
     controlBtn.disabled = false;
     if (leaving) return;
     if (e.detail.clean) return setStatus('Desconectado', 'bad');
@@ -188,7 +231,7 @@ async function setControl(on) {
     } catch { /* sin bloqueo de teclado */ }
     if (!current()) return;
 
-    btn.textContent = 'Conectando control…';
+    setControlLabel(btn, 'Conectando control…');
     try {
       await postJson(`/api/devices/${ip}/control`, { conn: targetConn });
       if (!current()) {
@@ -198,19 +241,19 @@ async function setControl(on) {
       }
       controlling = true;
       rfb.viewOnly = false;
-      btn.classList.add('active');
-      btn.textContent = 'Controlando (soltar)';
+      setControlActive(btn, true);
+      setControlLabel(btn, 'Soltar control');
       setFast(true);
       rfb.focus();
       hint(locked
-        ? 'Controlando: todas las teclas (Windows, Alt+Tab, Esc…) van al equipo remoto. Para salir del control mantén presionada Esc o pulsa "Controlando (soltar)".'
-        : 'Controlando. Este navegador no permite capturar la tecla Windows ni Alt+Tab: usa los botones ⊞ Win, Alt+Tab, Esc de la barra.', !locked);
+        ? 'Controlando: todas las teclas (Windows, Alt+Tab, Esc…) van al equipo remoto. Para salir del control mantén presionada Esc o pulsa «Soltar control».'
+        : 'Controlando. Este navegador no permite capturar la tecla Windows ni Alt+Tab: abre «Teclado» en la barra para enviarlos.', !locked);
     } catch (e) {
       if (!current()) return;
       controlling = false;
       rfb.viewOnly = true;
-      btn.classList.remove('active');
-      btn.textContent = 'Tomar control';
+      setControlActive(btn, false);
+      setControlLabel(btn, 'Tomar control');
       if (navigator.keyboard?.unlock) navigator.keyboard.unlock();
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
       setFast(false);
@@ -221,8 +264,8 @@ async function setControl(on) {
     releaseAll();
     controlling = false;
     rfb.viewOnly = true;
-    btn.classList.remove('active');
-    btn.textContent = 'Tomar control';
+    setControlActive(btn, false);
+    setControlLabel(btn, 'Tomar control');
     let failed = false;
     try {
       await postJson(`/api/devices/${ip}/release`, { conn: targetConn });
@@ -279,6 +322,21 @@ function applyQuality() {
   rfb.qualityLevel = Number($('#quality').value);
   rfb.compressionLevel = Number($('#compression').value);
 }
+function syncRangeOutputs() {
+  for (const id of ['quality', 'compression']) {
+    const input = $(`#${id}`);
+    const out = $(`#${id}Out`);
+    if (input && out) out.textContent = input.value;
+  }
+}
+function setFastUi(on) {
+  const btn = $('#fast');
+  btn.classList.toggle('active', on);
+  btn.setAttribute('aria-pressed', String(on));
+  btn.title = on
+    ? 'Modo rápido activo: imagen liviana. Clic para volver a la calidad normal'
+    : 'Activar el modo rápido: imagen más liviana para que responda mejor';
+}
 function setFast(on) {
   const active = normal !== null;
   if (on === active) return;
@@ -291,10 +349,12 @@ function setFast(on) {
     $('#compression').value = normal.compression;
     normal = null;
   }
-  $('#fast').classList.toggle('active', on);
-  $('#fast').textContent = on ? '⚡ Rápido (volver a normal)' : '⚡ Rápido';
+  setFastUi(on);
+  syncRangeOutputs();
   applyQuality();
 }
+setFastUi(false);
+syncRangeOutputs();
 $('#fast').addEventListener('click', () => setFast(normal === null));
 
 $('#control').addEventListener('click', () => {
@@ -441,11 +501,12 @@ $('#restartNg').addEventListener('click', async () => {
 
 // Mover un control a mano sale del modo Rápido (sin pisar lo que se acaba de elegir)
 for (const id of ['#quality', '#compression']) {
-  $(id).addEventListener('change', () => {
+  const input = $(id);
+  input.addEventListener('input', syncRangeOutputs);
+  input.addEventListener('change', () => {
     if (normal !== null) {
       normal = null;
-      $('#fast').classList.remove('active');
-      $('#fast').textContent = '⚡ Rápido';
+      setFastUi(false);
     }
     applyQuality();
   });
@@ -458,6 +519,17 @@ $('#fullscreen').addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen();
 });
+function syncFullscreen() {
+  const btn = $('#fullscreen');
+  const on = !!document.fullscreenElement;
+  btn.classList.toggle('active', on);
+  btn.setAttribute('aria-pressed', String(on));
+  const label = on ? 'Salir de pantalla completa' : 'Pantalla completa';
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+}
+document.addEventListener('fullscreenchange', syncFullscreen);
+syncFullscreen();
 $('#reconnect').addEventListener('click', () => connect());
 
 window.addEventListener('beforeunload', releaseAll);
